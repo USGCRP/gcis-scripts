@@ -152,6 +152,7 @@ pod2usage(msg => "missing url or endnote file", verbose => 1) unless ($url && $e
 
 my %diff;
 my $n_updates = 0;
+# my $test = '10.2105/AJPH.91.8.1194';
 
 say " importing endnote references";
 say "   url : $url";
@@ -174,11 +175,14 @@ sub xml_unescape {
   return undef unless defined($str);
 
   for ($str) {
-      s/&amp;/&/g;
-      s/&lt;/</g;
-      s/&gt;/>/g;
       s/&quot;/"/g;
-      s/&#39;/'/g;
+      s/&amp;/&/g;  s/&#39;/'/g;
+      s/&#40;/(/g;  s/&#41;/)/g;
+      s/&#44;/-/g;
+      s/&#58;/:/g;  s/&#59;/;/g;
+      s/&lt;/</g;   s/&gt;/>/g;
+      s/&#91;/[/g;  s/&#92;/]/g;
+      s/&#8211;/-/g;
   }
 
   return $str;
@@ -222,6 +226,7 @@ sub compare_hash {
         next if $a->{$_} eq $b->{$_};
         if ($_ eq 'title') {
            next if lc $a->{$_} eq lc $b->{$_};
+           next if lc $a->{$_} eq lc xml_unescape($b->{$_});
         }
         $c{$_} = {_A_ => $a->{$_}, _B_ => $b->{$_}};
     }
@@ -352,12 +357,10 @@ sub fix_issn {
 sub fix_doi {
     my ($e, $d) = @_;
 
-    my $a->{doi} = $d or return 0;
+    my $a->{doi} = $d or return undef;
     $a->{uri} = "/article/$d";
     $e->fix_errata($a);
-    $_[1] = $a->{doi} if $d ne $a->{doi};
-
-    return 1;
+    return $a->{doi};
 }
 
 sub import_article {
@@ -373,7 +376,7 @@ sub import_article {
         say " no doi : $a->{title}";
         return 0;
     };
-    fix_doi($e, $a->{doi});
+    $a->{doi} = fix_doi($e, $a->{doi});
     my $c = $cr->get($a->{doi}) or do {
         say " doi not in crossref : $a->{doi}";
         return 0;
@@ -555,6 +558,10 @@ sub main {
 
     for my $ref (@{ $r->{records} }) {
         next unless $ref->{reftype}[0] eq 'Journal Article';
+        # if ($test) {
+        #     next unless $ref->{doi}[0];
+        #     next unless $ref->{doi}[0] eq $test;
+        # }
         # say " ref :\n".Dumper($ref);
         say '';
         import_article($g, $e, $cr, $ref) or next;
