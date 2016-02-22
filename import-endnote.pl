@@ -120,7 +120,7 @@ yet!]
 use lib './lib';
 
 use Data::Dumper;
-use Gcis::Exim;
+use Gcis::Client;
 use Refs;
 use CrossRef;
 use Errata;
@@ -128,10 +128,13 @@ use Clone::PP qw(clone);
 use YAML::XS;
 use Getopt::Long;
 use Pod::Usage;
+
 use strict;
 use v5.14;
-
 use warnings;
+
+binmode STDIN, ':encoding(utf8)';
+binmode STDOUT, ':encoding(utf8)';
 
 GetOptions(
     'url=s'                 => \(my $url),
@@ -224,9 +227,13 @@ sub compare_hash {
             next;
         }
         next if $a->{$_} eq $b->{$_};
-        if ($_ eq 'title') {
-           next if lc $a->{$_} eq lc $b->{$_};
-           next if lc $a->{$_} eq lc xml_unescape($b->{$_});
+        my $a1 = lc xml_unescape($a->{$_});
+        my $b1 = lc xml_unescape($b->{$_});
+        next if $a1 eq $b1;
+        if (lc $_ eq 'author') {
+            $a1 =~ s/\r/; /g;
+            $b1 =~ s/\r/; /g;
+            next if $a1 eq $b1;
         }
         $c{$_} = {_A_ => $a->{$_}, _B_ => $b->{$_}};
     }
@@ -374,8 +381,10 @@ sub import_article {
     };
     $a->{doi} = $r->{doi}[0] or do {
         say " no doi : $a->{title}";
+        # say " r :\n".Dumper($r);
         return 0;
     };
+
     $a->{doi} = fix_doi($e, $a->{doi});
     my $c = $cr->get($a->{doi}) or do {
         say " doi not in crossref : $a->{doi}";
@@ -479,7 +488,11 @@ sub import_article {
     $ba->{Journal} = $j->{title};
 
     $ba->{Issue} = $c->{issue};
-    $ba->{Author} = join '; ', @{ $c->{author} } if $c->{author};
+    for ($r->{author}, $c->{author}) {
+        next unless $_;
+        $ba->{Author} = join '; ', @{ $_ };
+        last;
+    }
 
     say " bib :\n".Dumper($b) if $verbose;
 
@@ -543,7 +556,8 @@ sub dump_diff {
 }
 
 sub main {
-    my $g = Exim->new($url, ($dry_run ? '' : 'update'));
+    my $g = $dry_run ? Gcis::Client->new(url => $url)
+                     : Gcis::Client->connect(url => $url);
     my $cr = CrossRef->new;
     my $e = Errata->load($errata_file);
 

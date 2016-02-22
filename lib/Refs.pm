@@ -45,7 +45,8 @@ sub load {
     my $s = shift;
     my $file = shift;
     -e $file or die "$file : $!";
-    my $dom = Mojo::DOM->new->xml(1)->parse(scalar file($file)->slurp);
+    my $c = file($file)->slurp(iomode => '<:encoding(UTF-8)');
+    my $dom = Mojo::DOM->new->xml(1)->parse($c);
     $s->{dom} = $dom;
     my $i = 0;
     for my $rec ($s->{dom}->find('record')->each) {
@@ -70,7 +71,8 @@ sub _parse_record {
                      map $_->text, $rec->find($spec)->each);
         $data{$e} = \@found;
     }
-    
+    s/,(\S)/, $1/ for @{ $data{author} };
+
     return \%data;
 }
 

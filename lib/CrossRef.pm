@@ -19,7 +19,6 @@ sub new {
 sub get {
     my ($s, $doi) = @_;
 
-    say " doi : $doi";
     my $d = $s->{gcis}->get("/works/$doi") or do {
         say " no article for doi : $doi";
         return undef;
