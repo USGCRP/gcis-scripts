@@ -384,7 +384,6 @@ sub import_article {
         # say " r :\n".Dumper($r);
         return 0;
     };
-
     $a->{doi} = fix_doi($e, $a->{doi});
     my $c = $cr->get($a->{doi}) or do {
         say " doi not in crossref : $a->{doi}";

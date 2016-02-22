@@ -72,7 +72,6 @@ sub _parse_record {
         $data{$e} = \@found;
     }
     s/,(\S)/, $1/ for @{ $data{author} };
-
     return \%data;
 }
 
