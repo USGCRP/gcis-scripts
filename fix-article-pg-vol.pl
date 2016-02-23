@@ -10,7 +10,7 @@ use warnings;
 
 my $url = "https://data.gcis-dev-front.joss.ucar.edu";
 my $dry_run = 0;
-my $max_updates = 100;
+my $max_updates = -1;
 my $do_all = 1;
 
 &main;
@@ -35,14 +35,14 @@ sub main {
             say " doi not in crossref : $u";
             next;
         };
-        if (!$c->{title}[0]) {
+        if (!$c->{title}) {
             say " title not in crossref : $u";
             next;
         }
-        if (lc $a->{title} ne lc $c->{title}[0]) {
+        if (lc $a->{title} ne lc $c->{title}) {
             say " titles do not match : $u";
             say "   gcis     : $a->{title}";
-            say "   crossref : $c->{title}[0]";
+            say "   crossref : $c->{title}";
             next;
         }
         my %check = (
