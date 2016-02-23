@@ -155,7 +155,7 @@ pod2usage(msg => "missing url or endnote file", verbose => 1) unless ($url && $e
 
 my %diff;
 my $n_updates = 0;
-# my $test = '10.2105/AJPH.91.8.1194';
+my %test; # = (ref_key => '197d65cd-c05e-4ddb-8a9d-5a9aed134974');
 
 say " importing endnote references";
 say "   url : $url";
@@ -176,6 +176,13 @@ say '';
 sub xml_unescape {
   my $str = shift;
   return undef unless defined($str);
+
+ # for ($str) {
+ #     s/\xe2\x96\x92\x7e//g;
+ #     s/\xc3\xa2\x40/-/g;
+ #     s/\x43\x45/\xc3\x85/g;
+ #     s/\x43\xc2/\xc3\xb6/g;
+ # }
 
   for ($str) {
       s/&quot;/"/g;
@@ -208,10 +215,12 @@ sub make_identifier {
 }
 
 sub compare_hash {
-    my ($a, $b) = @_;
+    my ($a, $b, @i) = @_;
 
+    my %i1 = map { $_ => 1 } @i;
     my %c;
     for (keys %{ $a }) {
+        next if $i1{$_};
         next if !$a->{$_}  &&  !$b->{$_};
         if (!$b->{$_}) {
            $c{$_} = {_A_ => $a->{$_}, _B_ => undef};
@@ -222,28 +231,46 @@ sub compare_hash {
            next;
         }
         if (ref $a->{$_} eq 'HASH') {
-            my $c1 = compare_hash($a->{$_}, $b->{$_}) or next;
+            my $c1 = compare_hash($a->{$_}, $b->{$_}, @i) or next;
             $c{$_} = $c1;
             next;
         }
         next if $a->{$_} eq $b->{$_};
         my $a1 = lc xml_unescape($a->{$_});
         my $b1 = lc xml_unescape($b->{$_});
+        for ($a1, $b1) {
+            s/^\s+//; s/\s+$//; s/\.$//;
+        }
         next if $a1 eq $b1;
         if (lc $_ eq 'author') {
-            $a1 =~ s/\r/; /g;
-            $b1 =~ s/\r/; /g;
-            next if $a1 eq $b1;
+            next if compare_author($a1, $b1);
         }
         $c{$_} = {_A_ => $a->{$_}, _B_ => $b->{$_}};
     }
     return %c ? \%c : undef;
 }
 
-sub compare {
+sub compare_author {
     my ($a, $b) = @_;
+    $a =~ s/\r/; /g;
+    $b =~ s/\r/; /g;
+    my @a1 = split '; ', $a;
+    my @b1 = split '; ', $b;
+    for my $a2 (@a1) {
+        my $b2 = shift @b1;
+        return 0 unless $b2;
+        my ($al, $af) = split ', ', $a2;
+        my ($bl, $bf) = split ', ', $b2;
+        return 0 if $al ne $bl;
+        return 0 if substr($af, 0, 1) ne substr($bf, 0, 1);
+    }
+    return 1;
+}
 
-    my $c = compare_hash($a, $b);
+sub compare {
+    my ($a, $b, @i) = @_;
+
+    my $c = compare_hash($a, $b, @i);
     return $c unless $c;
 
     $diff{$a->{uri}} = $c;
@@ -328,7 +355,7 @@ sub get_journal {
     return $r;
 }
 
-sub fix_issn {
+sub fix_jou_issn {
     my ($a, $b) = @_;
 
     my @v = qw(print_issn online_issn);
@@ -361,6 +388,23 @@ sub fix_issn {
     return $nc;
 }
 
+sub fix_bib_issn {
+    my ($ba, $b1, $j) = @_; 
+
+    return 0 unless $ba->{ISSN};
+    return 0 unless $b1->{ISSN};
+    return 0 if $ba->{ISSN} eq $b1->{ISSN};
+
+    my @i = ($j->{online_issn}, $j->{print_issn});
+    return 0 unless @i > 1;
+    for (@i) {
+        next unless $_ eq $b1->{ISSN};
+        $ba->{ISSN} = $b1->{ISSN};
+        return 1;
+    }
+    return 0;
+}
+
 sub fix_doi {
     my ($e, $d) = @_;
 
@@ -375,10 +419,14 @@ sub import_article {
 
     my $a;
     # say " r :\n".Dumper($r);
-    $a->{title} = xml_unescape($r->{title}[0]) or do {
+    $a->{title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
         say " no title!";
         return 0;
     };
+    for ($a->{title}) {
+        s/\(\s+/\(/g;  s/\s+\)/\)/g;
+    }
+
     $a->{doi} = $r->{doi}[0] or do {
         say " no doi : $a->{title}";
         # say " r :\n".Dumper($r);
@@ -405,17 +453,17 @@ sub import_article {
 
     say " jou :\n".Dumper($j) if $verbose;
 
-    my $j1 = $g->get($j->{uri});
-    if (!$j1) {
+    my $jg = $g->get($j->{uri});
+    if (!$jg) {
         if (!$j->{print_issn}  &&  !$j->{online_issn}) {
             say " no journal issn : $j->{uri}";
             return 0;
         }
-        $j1 = get_journal($g, $c->{issn});
+        $jg = get_journal($g, $c->{issn});
     }
-    if ($j1) {
-        fix_issn($j, $j1);
-        my $d = compare($j, $j1);
+    if ($jg) {
+        fix_jou_issn($j, $jg);
+        my $d = compare($j, $jg);
         if ($d) {
             say " existing journal different : $j->{uri}";
             return 0;
@@ -434,7 +482,6 @@ sub import_article {
        url           => 'urls', 
     );
     $a->{$_} = $r->{$a_map{$_}}[0] for keys %a_map;
-    $a->{journal_pages} =~ s/S//g if $a->{journal_pages};
     $a->{identifier} = $a->{doi};
     $a->{uri} = "/article/$a->{doi}";
     $a->{journal_identifier} = $j->{identifier};
@@ -442,9 +489,21 @@ sub import_article {
 
     say " art :\n".Dumper($a) if $verbose;
 
-    my $a1 = $g->get($a->{uri});
-    if ($a1) {
-        my $d = compare($a, $a1);
+    my $ac;
+    $ac->{$_} = $a->{$_} for qw(uri doi title year journal_vol 
+                                journal_pages author);
+    $ac->{title} = xml_unescape($ac->{title});
+    $ac->{author} = xml_unescape(join '; ', @{ $r->{author} });
+
+    my $d = compare($ac, $c, qw(uri));
+    if ($d) {
+        say " crossref article different : $a->{uri}";
+        return 0;
+    }
+
+    my $ag = $g->get($a->{uri});
+    if ($ag) {
+        my $d = compare($a, $ag);
         if ($d) {
             say " existing article different : $a->{uri}";
             return 0;
@@ -487,17 +546,14 @@ sub import_article {
     $ba->{Journal} = $j->{title};
 
     $ba->{Issue} = $c->{issue};
-    for ($r->{author}, $c->{author}) {
-        next unless $_;
-        $ba->{Author} = join '; ', @{ $_ };
-        last;
-    }
+    $ba->{Author} = $ac->{author};
 
     say " bib :\n".Dumper($b) if $verbose;
 
     my $b1 = $g->get($b->{uri});
     if ($b1) {
-        my $d = compare($b, $b1);
+        fix_bib_issn($ba, $b1, $j);
+        my $d = compare($b, $b1, qw(_record_number));
         if ($d) {
             say " existing reference different : $b->{uri}";
             return 0;
@@ -571,10 +627,17 @@ sub main {
 
     for my $ref (@{ $r->{records} }) {
         next unless $ref->{reftype}[0] eq 'Journal Article';
-        # if ($test) {
-        #     next unless $ref->{doi}[0];
-        #     next unless $ref->{doi}[0] eq $test;
-        # }
+        my $do_it = 1;
+        if (keys %test) {
+            $do_it = 0;
+            for (keys %test) {
+                next unless $ref->{$_}[0];
+                next unless $ref->{$_}[0] eq $test{$_};
+                $do_it = 1;
+                last;
+            }
+        }
+        next unless $do_it;
         # say " ref :\n".Dumper($ref);
         say '';
         import_article($g, $e, $cr, $ref) or next;

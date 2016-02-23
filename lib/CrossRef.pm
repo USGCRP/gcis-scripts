@@ -31,7 +31,7 @@ sub get {
     # say " r :\n".Dumper($r);
     my $a;
     $a->{doi} = $doi;
-    $a->{title} = clone($r->{title});
+    $a->{title} = join ': ', @{ $r->{title} };
     $a->{year} = $r->{issued}{'date-parts'}[0][0];
     $a->{issn} = clone($r->{ISSN});
     $a->{journal} = clone($r->{'container-title'});
@@ -42,7 +42,8 @@ sub get {
     for (@{ $r->{author} }) {
         my $name = $_->{family};
         $name .= ", ".$_->{given} if $_->{given};
-        push @{ $a->{author} }, $name;
+        $a->{author} .= "; " if $a->{author};
+        $a->{author} .= $name;
     }
 
     return $a;
