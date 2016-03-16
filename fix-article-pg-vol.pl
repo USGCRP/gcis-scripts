@@ -8,7 +8,8 @@ use strict;
 use v5.14;
 use warnings;
 
-my $url = "https://data.gcis-dev-front.joss.ucar.edu";
+# my $url = "https://data.gcis-dev-front.joss.ucar.edu";
+my $url = "https://data-stage.globalchange.gov";
 my $dry_run = 0;
 my $max_updates = -1;
 my $do_all = 1;
