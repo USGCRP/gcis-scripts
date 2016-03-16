@@ -46,6 +46,11 @@ sub get {
         $a->{author} .= $name;
     }
 
+    for (keys %{ $a }) {
+        $a->{$_} =~ s/^\s+//;
+        $a->{$_} =~ s/\s+$//;
+    }
+
     return $a;
 }
 

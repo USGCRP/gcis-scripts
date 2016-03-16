@@ -72,6 +72,10 @@ Flag indicating articles are not to be added
 
 Flag indicating references are not to be added
 
+=item B<--wait>
+
+Time to wait between GCIS updates (seconds; defaults to -1 - do not wait)
+
 =item B<--errata_file>
 
 Errata file (yaml) - contains aliases for entries that
@@ -128,6 +132,7 @@ use Clone::PP qw(clone);
 use YAML::XS;
 use Getopt::Long;
 use Pod::Usage;
+use Time::HiRes qw(usleep);
 
 use strict;
 use v5.14;
@@ -144,6 +149,7 @@ GetOptions(
     'do_not_add_journals'   => \(my $do_not_add_journals),
     'do_not_add_articles'   => \(my $do_not_add_articles),
     'do_not_add_referneces' => \(my $do_not_add_references),
+    'wait=i'                => \(my $wait = -1),
     'errata_file=s'         => \(my $errata_file),
     'diff_file=s'           => \(my $diff_file),
     'verbose'               => \(my $verbose),
@@ -155,7 +161,25 @@ pod2usage(msg => "missing url or endnote file", verbose => 1) unless ($url && $e
 
 my %diff;
 my $n_updates = 0;
-my %test; # = (ref_key => '197d65cd-c05e-4ddb-8a9d-5a9aed134974');
+my %stats;
+my %test;
+#     '10.1175/1520-0477(1997)078<1107:tchwhl>2.0.co;2' => 'doi', 
+#     '10.3394/0380-1330(2007)33[566:dafoec]2.0.co;2' => 'doi', 
+#     '10.3376/1081-1710(2007)32[22:CALCFP]2.0.CO;2' => 'doi', 
+#     '10.3376/1081-1710(2008)33[89:iocvom]2.0.co;2' => 'doi', 
+#     '10.1603/0022-2585(2005)042[0367:ahamdc]2.0.co;2' => 'doi', 
+#     '10.1021/es900518z' => 'doi',
+#     '10.3354/cr027177' => 'doi', 
+#     '10.1001/jama.292.19.2372' => 'doi', 
+#     '01c49cdf-06bb-41ef-95be-37a8553295b7' => 'ref_key',
+#     '10.1002/etc.2046' => 'doi',
+#     '10.1001/archinternmed.2011.683' => 'doi',
+#     '197d65cd-c05e-4ddb-8a9d-5a9aed134974' => 'ref_key',
+my %test_jou;
+#     'international-journal-environmental-research--public-health' => 'journal',
+#     'philosophical-transactions-royal-society-b-biological-sciences' => 'journal', 
+#     'philosophical-transactions-royal-society-a-mathematical-physical-and-engineering-sciences' => 'journal', 
+#     'atmospheric-chemistry-physics' => 'journal', 
 
 say " importing endnote references";
 say "   url : $url";
@@ -200,6 +224,8 @@ sub xml_unescape {
 
 sub make_identifier {
     my $str = shift or return undef;
+    my $max_char = shift;
+
     my @words = split /\s+/, $str;
     my $id = '';
     for (@words) {
@@ -209,15 +235,18 @@ sub make_identifier {
         next unless length;
         $id .= '-' if length($id);
         $id .= $_;
-        last if length($id) > 30;
+        if ($max_char) {
+            last if $max_char > 0  &&  length($id) > $max_char;
+        }
     }
+    $id =~ s/-+/-/g;
     return $id;
 }
 
 sub compare_hash {
-    my ($a, $b, @i) = @_;
+    my ($a, $b, $i) = @_;
 
-    my %i1 = map { $_ => 1 } @i;
+    my %i1 = map { $_ => 1 } @{ $i };
     my %c;
     for (keys %{ $a }) {
         next if $i1{$_};
@@ -231,7 +260,7 @@ sub compare_hash {
            next;
         }
         if (ref $a->{$_} eq 'HASH') {
-            my $c1 = compare_hash($a->{$_}, $b->{$_}, @i) or next;
+            my $c1 = compare_hash($a->{$_}, $b->{$_}, $i) or next;
             $c{$_} = $c1;
             next;
         }
@@ -262,15 +291,18 @@ sub compare_author {
         my ($al, $af) = split ', ', $a2;
         my ($bl, $bf) = split ', ', $b2;
         return 0 if $al ne $bl;
+        next if !$af && !$bf;
+        return 0 if $af && !$bf;
+        return 0 if $bf && !$af;
         return 0 if substr($af, 0, 1) ne substr($bf, 0, 1);
     }
     return 1;
 }
 
 sub compare {
-    my ($a, $b, @i) = @_;
+    my ($a, $b, $i) = @_;
 
-    my $c = compare_hash($a, $b, @i);
+    my $c = compare_hash($a, $b, $i);
     return $c unless $c;
 
     $diff{$a->{uri}} = $c;
@@ -290,6 +322,21 @@ sub remove_undefs {
     return 1;
 }
 
+sub fix_identifier {
+    my $r = shift;
+
+    return 1 unless $r->{identifier};
+    my %list = (
+        '<' => '%3C', '>' => '%3E', 
+        '\[' => '%5B', '\]' => '%5D', 
+        );
+    for (keys %list) {
+        $r->{identifier} =~ s/$_/$list{$_}/g;
+    }
+
+    return 1;
+}
+
 sub add_item {
     my ($g, $j) = @_;
 
@@ -299,15 +346,19 @@ sub add_item {
     if ($dry_run) {
         say " would add $t : $u";
         $n_updates++;
+        $stats{"would_add_$t"}++;
         return 1;
     }
 
     say " adding $t : $u";
+    $stats{"added_$t"}++;
     my $n = clone($j);
     delete $n->{uri};
     remove_undefs($n);
+    # fix_identifier($n);
     $n_updates++;
     $g->post("/$t", $n) or die " unable to add $t : $u";
+    sleep($wait) if $wait > 0;
 
     return 1;
 }
@@ -320,10 +371,12 @@ sub add_child_pub {
     if ($dry_run) {
         say " would add child pub : $u";
         $n_updates++;
+        $stats{would_add_child_pub}++;
         return 1;
     }
 
     say " adding child pub : $u";
+    $stats{added_child_pub}++;
     my $a = clone($j->{attrs});
     remove_undefs($a);
     $n_updates++;
@@ -332,6 +385,7 @@ sub add_child_pub {
         attrs => $a,
         child_publication_uri => $j->{child_publication_uri},
         }) or die " unable to add child pub : $u";
+    sleep($wait) if $wait > 0;
 
     return 1;
 }
@@ -359,33 +413,39 @@ sub fix_jou_issn {
     my ($a, $b) = @_;
 
     my @v = qw(print_issn online_issn);
-    my %b1;
-    my %a1;
-    my $nb = 0;
-    my $nc = 0;
-    for (@v) {
-        $a1{$_} = $a->{$_}; 
-        $b->{$_} or next;
-        $b1{$b->{$_}} = $_;
-        $nb++;
-    }
-    return $nc if $nb == 0;
 
-    for (@v) {
-        $a1{$_} or next;
-        my $i = $b1{$a1{$_}} or next;
-        next if $i eq $_;
-        $a->{$i} = $a1{$_};
-        $a->{$_} = $a1{$i};
-        $nc++;
+    my $nm = 0;
+    my $na = 0;
+    my $ka;
+    my $kb;
+    for my $k (@v) {
+        next unless $a->{$k};
+        $na++;
+        for (@v) {
+            next unless $b->{$_};
+            next unless $a->{$k} eq $b->{$_};
+            $ka = $k;
+            $kb = $_;
+            $nm++;
+        }
     }
-
-    if ($b->{online_issn}  &&  !$a->{online_issn}) {
-        $a->{online_issn} = $b->{online_issn};
-        $nc++;
+    return 0 if $nm < 1  ||  $nm > 2;
+    if ($na < 2) {
+        $a->{$_} = $b->{$_} for @v;
+        return 1;
     }
+    if ($nm > 1) {
+        return 0 if $a->{print_issn} eq $a->{online_issn};
+        return 0 if $b->{print_issn} eq $b->{online_issn};
+        $a->{$_} = $b->{$_} for @v;
+        return 1;
+    }
+    return 0 if $ka eq $kb;
 
-    return $nc;
+    my $s = $a->{$ka};
+    $a->{$ka} = $a->{$kb};
+    $a->{$kb} = $s;
+    return 1;
 }
 
 sub fix_bib_issn {
@@ -421,6 +481,7 @@ sub import_article {
     # say " r :\n".Dumper($r);
     $a->{title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
         say " no title!";
+        $stats{no_title}++;
         return 0;
     };
     for ($a->{title}) {
@@ -429,12 +490,14 @@ sub import_article {
 
     $a->{doi} = $r->{doi}[0] or do {
         say " no doi : $a->{title}";
+        $stats{no_doi}++;
         # say " r :\n".Dumper($r);
         return 0;
     };
     $a->{doi} = fix_doi($e, $a->{doi});
     my $c = $cr->get($a->{doi}) or do {
         say " doi not in crossref : $a->{doi}";
+        $stats{doi_not_in_crossref}++;
         return 0;
     };
     # say " c :\n".Dumper($c);
@@ -442,33 +505,53 @@ sub import_article {
     my $j;
     $j->{title} = xml_unescape($r->{secondary_title}[0]) or do {
         say " no journal title : $a->{title}";
+        $stats{no_journal_title}++;
         return 0;
     };
-    $j->{identifier} = make_identifier($j->{title});
-    $j->{uri} = '/journal/'.$j->{identifier};
+
+    my $jg;
+    for my $max_char (-1, 40, 30) {
+        $j->{identifier} = make_identifier($j->{title}, $max_char);
+        $j->{uri} = '/journal/'.$j->{identifier};
+        $jg = $g->get($j->{uri});
+        last if $jg;
+    }
+    if (!$jg) {
+        $j->{identifier} = make_identifier($j->{title}, 40);
+        $j->{uri} = '/journal/'.$j->{identifier};
+    }
     $j->{print_issn} = $c->{issn}[0];
     $j->{online_issn} = $c->{issn}[1];
     $j->{publisher} = $a->{publisher} ? $a->{publisher} : $c->{publisher};
     $e->fix_errata($j);
 
+    if (%test_jou) {
+        return 0 unless $test_jou{$j->{identifier}};
+    }
+
     say " jou :\n".Dumper($j) if $verbose;
 
-    my $jg = $g->get($j->{uri});
     if (!$jg) {
-        if (!$j->{print_issn}  &&  !$j->{online_issn}) {
-            say " no journal issn : $j->{uri}";
-            return 0;
+        $jg = $g->get($j->{uri});
+        if (!$jg) {
+            if (!$j->{print_issn}  &&  !$j->{online_issn}) {
+                say " no journal issn : $j->{uri}";
+                $stats{no_journal_issn}++;
+                return 0;
+            }
+            $jg = get_journal($g, $c->{issn});
         }
-        $jg = get_journal($g, $c->{issn});
     }
     if ($jg) {
         fix_jou_issn($j, $jg);
-        my $d = compare($j, $jg);
+        my $d = compare($j, $jg, $e->diff_okay($j));
         if ($d) {
             say " existing journal different : $j->{uri}";
+            $stats{existing_journal_different}++;
             return 0;
         }
         say " existing journal same : $j->{uri}";
+        $stats{existing_journal_same}++;
     } elsif (!$do_not_add_journals) {
         add_item($g, $j) or return 0;
     } else {
@@ -494,21 +577,29 @@ sub import_article {
                                 journal_pages author);
     $ac->{title} = xml_unescape($ac->{title});
     $ac->{author} = xml_unescape(join '; ', @{ $r->{author} });
+    $e->fix_errata($ac);
 
-    my $d = compare($ac, $c, qw(uri));
+    my $ig = $e->diff_okay($ac);
+    push @{ $ig }, qw(uri);
+    my $d = compare($ac, $c, $ig);
     if ($d) {
         say " crossref article different : $a->{uri}";
+        $stats{crossref_article_different}++;
         return 0;
     }
 
     my $ag = $g->get($a->{uri});
     if ($ag) {
-        my $d = compare($a, $ag);
+        my $ig = $e->diff_okay($ac);
+        push @{ $ig }, qw(uri);
+        my $d = compare($a, $ag, $ig);
         if ($d) {
             say " existing article different : $a->{uri}";
+            $stats{existing_article_different}++;
             return 0;
         }
         say " existing article same : $a->{uri}";
+        $stats{existing_article_same}++;
     } elsif (!$do_not_add_articles) {
        add_item($g, $a) or return 0;
     } else {
@@ -547,26 +638,32 @@ sub import_article {
 
     $ba->{Issue} = $c->{issue};
     $ba->{Author} = $ac->{author};
+    $e->fix_errata($b);
 
     say " bib :\n".Dumper($b) if $verbose;
 
     my $b1 = $g->get($b->{uri});
     if ($b1) {
-        fix_bib_issn($ba, $b1, $j);
-        my $d = compare($b, $b1, qw(_record_number));
+        fix_bib_issn($ba, $b1->{attrs}, $j);
+        my $ig = $e->diff_okay($b);
+        push @{ $ig }, qw(_record_number);
+        my $d = compare($b, $b1, $ig);
         if ($d) {
             say " existing reference different : $b->{uri}";
+            $stats{existing_reference_different}++;
             return 0;
         }
         say " existing reference same : $b->{uri}";
-        return 1;
+        $stats{existing_reference_same}++;
+        return 0 if $do_not_add_references  ||  $b1->{child_publication};
     } elsif (!$do_not_add_references) {
         add_item($g, $b) or return 0;
-        $b->{child_publication_uri} = $a->{uri};
-        add_child_pub($g, $b) or return 0;
     } else {
         return 0;
     }
+
+    $b->{child_publication_uri} = $a->{uri};
+    add_child_pub($g, $b) or return 0;
 
     return 1;
 }
@@ -589,8 +686,6 @@ sub format_diff {
 sub dump_diff {
 
     my $n_diff = keys %diff;
-    say '';
-    say " n diff : $n_diff";
     return 1 if $n_diff == 0  ||  !$diff_file;
 
     my $y;
@@ -621,18 +716,23 @@ sub main {
     $r->load($endnote_file);
     my $n = $r->type_counts;
     say " endnote entries : ";
+    my $n_tot = 0;
     for (keys %{ $n }) {
         say "   $_ : $n->{$_}";
+        $n_tot += $n->{$_};
     }
+    say "   total : $n_tot";
 
     for my $ref (@{ $r->{records} }) {
         next unless $ref->{reftype}[0] eq 'Journal Article';
+        # say " doi : $ref->{doi}[0]";
         my $do_it = 1;
         if (keys %test) {
             $do_it = 0;
             for (keys %test) {
-                next unless $ref->{$_}[0];
-                next unless $ref->{$_}[0] eq $test{$_};
+                my $t = $test{$_};
+                next unless $ref->{$t}[0];
+                next unless $ref->{$t}[0] eq $_;
                 $do_it = 1;
                 last;
             }
@@ -644,6 +744,17 @@ sub main {
         last if $max_updates > 0  &&  $n_updates >= $max_updates;
     }
     dump_diff;
+
+    my $n_diff = keys %diff;
+    say '';
+    say " n diff : $n_diff";
+
+    my $n_stat = 0;
+    for (sort keys %stats) {
+        say "   $_ : $stats{$_}";
+        $n_stat += $stats{$_};
+    }
+    say " n stat : $n_stat";
 
     return;
 }
