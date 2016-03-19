@@ -28,6 +28,9 @@ entry and the EndNote file.  This allows for the new entry obtained from
 EndNote to be different from the information stored in GCIS (the GCIS 
 information is not changed).
 
+A file containing my be given contining a set of alternate ids 
+that are based on the url.
+
 [Note: Only EndNote 'Journal Articles' are currently implemented.]
 
 =head1 SYNOPSIS
@@ -86,6 +89,11 @@ already exists (see below for file example)
 Difference file (yaml) - contains differences between the new
 entry and an existing GCIS entry
 
+=idem B<--alt_id_file>
+
+Alternate id file (yaml) containing a mapping between a url
+and an alternate id.
+
 =item B<--verbose>
 
 Verbose option
@@ -105,19 +113,23 @@ Dry run option
 
 Example errata file (value corresponds to GCIS, alias to input):
 
-   ---
-   article:
-   - uri: /reference/one-with-an-issue
-     errata:
-     - item: print_issn
-       value: 0001-0002
-       alias: 9991-9992
+---
+article:
+- uri: /reference/one-with-an-issue
+  errata:
+  - item: print_issn
+    value: 0001-0002
+    alias: 9991-9992
 
 Items in the difference file can be converted to errata items, 
 but each item should be carefully considered.
 
-[Note, Reading errata for reference attributes is not implmented, 
-yet!]
+Example alternate id file:
+
+---
+- uri: 'http://my.url.com/unique-url.html'
+  id: pmid-id
+   
 
 =cut
 
@@ -133,6 +145,7 @@ use YAML::XS;
 use Getopt::Long;
 use Pod::Usage;
 use Time::HiRes qw(usleep);
+use PubMed;
 
 use strict;
 use v5.14;
@@ -152,6 +165,7 @@ GetOptions(
     'wait=i'                => \(my $wait = -1),
     'errata_file=s'         => \(my $errata_file),
     'diff_file=s'           => \(my $diff_file),
+    'alt_id_file=s'         => \(my $alt_id_file), 
     'verbose'               => \(my $verbose),
     'dry_run|n'             => \(my $dry_run),
     'help|?'                => sub { pod2usage(verbose => 2) },
@@ -162,7 +176,12 @@ pod2usage(msg => "missing url or endnote file", verbose => 1) unless ($url && $e
 my %diff;
 my $n_updates = 0;
 my %stats;
+my $skip_dois = 1;
 my %test;
+#     '10.1021/es900518z' => 'doi',
+#     'http://www.cdc.gov/pcd//issues/2008/jan/07_0135.htm' => 'urls', 
+#     'http://www.cdc.gov/mmwr/preview/mmwrhtml/mm6331a1.htm' => 'urls',
+#     'doi:10.1016/j.annemergmed.2006.12.004' => 'doi',
 #     '10.1175/1520-0477(1997)078<1107:tchwhl>2.0.co;2' => 'doi', 
 #     '10.3394/0380-1330(2007)33[566:dafoec]2.0.co;2' => 'doi', 
 #     '10.3376/1081-1710(2007)32[22:CALCFP]2.0.CO;2' => 'doi', 
@@ -189,8 +208,9 @@ say "   max_references : $max_references";
 say "   do_not_add_journals" if $do_not_add_journals;
 say "   do_not_add_articles" if $do_not_add_articles;
 say "   do_not_add_referneces" if $do_not_add_references;
-say "   errata_file : $errata_file";
+say "   errata_file : $errata_file" if $errata_file;
 say "   diff_file : $diff_file";
+say "   alt_id_file : $alt_id_file" if $alt_id_file;
 say "   verbose" if $verbose;
 say "   dry_run" if $dry_run;
 say '';
@@ -355,7 +375,6 @@ sub add_item {
     my $n = clone($j);
     delete $n->{uri};
     remove_undefs($n);
-    # fix_identifier($n);
     $n_updates++;
     $g->post("/$t", $n) or die " unable to add $t : $u";
     sleep($wait) if $wait > 0;
@@ -466,16 +485,28 @@ sub fix_bib_issn {
 }
 
 sub fix_doi {
-    my ($e, $d) = @_;
+    my ($e, $i) = @_;
 
-    my $a->{doi} = $d or return undef;
-    $a->{uri} = "/article/$d";
+    $i->{doi} or return 0;
+    my $a->{doi} = $i->{doi};
+    $a->{uri} = "/article/$->{doi}";
     $e->fix_errata($a);
-    return $a->{doi};
+    $i->{doi} = $a->{doi};
+    return 1;
+}
+
+sub fix_alt_id {
+     my ($ai, $id, $u) = @_;
+     return 0 unless $u;
+     return 1 unless $ai->{$u};
+     my ($k, $i) = split '-', $ai->{$u};
+     return 0 unless $k && $i;
+     $id->{$k} = $i;
+     return 1;
 }
 
 sub import_article {
-    my ($g, $e, $cr, $r) = @_;
+    my ($g, $e, $ai, $r) = @_;
 
     my $a;
     # say " r :\n".Dumper($r);
@@ -488,18 +519,40 @@ sub import_article {
         s/\(\s+/\(/g;  s/\s+\)/\)/g;
     }
 
-    $a->{doi} = $r->{doi}[0] or do {
-        say " no doi : $a->{title}";
-        $stats{no_doi}++;
-        # say " r :\n".Dumper($r);
-        return 0;
-    };
-    $a->{doi} = fix_doi($e, $a->{doi});
-    my $c = $cr->get($a->{doi}) or do {
-        say " doi not in crossref : $a->{doi}";
-        $stats{doi_not_in_crossref}++;
-        return 0;
-    };
+    my $url = $r->{urls}[0];
+    my $id;
+    $id->{doi} = $r->{doi}[0] if $r->{doi}[0];
+    fix_alt_id($ai, \%{ $id }, $url);
+    if ($id->{doi}) {
+        fix_doi($e, $id);
+        $a->{doi} = $id->{doi};
+    } elsif (!$id->{pmid}) {
+        $id->{pmid} = PubMed::alt_id($url, $r->{pages}[0]) or do {
+            say " no doi or alternate id : $a->{title}";
+            $stats{no_doi_or_alternate_id}++;
+            return 0;
+        };
+    }
+
+    my $c;
+    if ($id->{doi}) {
+        return 0 if $skip_dois;
+        my $cr = CrossRef->new;
+        $c = $cr->get($a->{doi}) or do {
+            say " doi not in crossref : $a->{doi}";
+            $stats{doi_not_in_crossref}++;
+            return 0;
+       };
+       $a->{identifier} = $a->{doi};
+    } elsif ($id->{pmid}) {
+       my $pm = PubMed->new;
+       $c = $pm->get($id->{pmid}) or do {
+            say " id not in pubmed : $id->{pmid}\n   for : $a->{title}";
+            $stats{id_not_in_pubmed}++;
+            return 0;
+       };
+       $a->{identifier} = 'pmid-'.$c->{pmid};
+    }
     # say " c :\n".Dumper($c);
 
     my $j;
@@ -565,8 +618,7 @@ sub import_article {
        url           => 'urls', 
     );
     $a->{$_} = $r->{$a_map{$_}}[0] for keys %a_map;
-    $a->{identifier} = $a->{doi};
-    $a->{uri} = "/article/$a->{doi}";
+    $a->{uri} = "/article/$a->{identifier}";
     $a->{journal_identifier} = $j->{identifier};
     $e->fix_errata($a);
 
@@ -583,8 +635,8 @@ sub import_article {
     push @{ $ig }, qw(uri);
     my $d = compare($ac, $c, $ig);
     if ($d) {
-        say " crossref article different : $a->{uri}";
-        $stats{crossref_article_different}++;
+        say " external source article different : $a->{uri}";
+        $stats{external_source_article_different}++;
         return 0;
     }
 
@@ -612,6 +664,7 @@ sub import_article {
 
     my %b_art = (
         DOI    => 'doi', 
+        PMID   => 'pmid',
         Pages  => 'journal_pages', 
         Title  => 'title', 
         Volume => 'journal_vol', 
@@ -699,21 +752,38 @@ sub dump_diff {
         push @{ $y }, $v;
     }
 
-    open my $f, '>:encoding(UTF-8)', $diff_file or die "can't open diff file";;
+    open my $f, '>:encoding(UTF-8)', $diff_file or die "can't open diff file";
     say $f Dump($y);
+    close $f;
 
     return 1;
+}
+
+sub load_alt_ids {
+    return undef unless $alt_id_file;
+    open my $f, '<:encoding(UTF-8)', $alt_id_file or 
+       die "can't open alternate id file";
+    my $yml = do { local $/; <$f> };
+    close $f;
+
+    my $y = Load($yml);
+    my $a;
+    for (@{ $y }) {
+       my $k = $_->{url} or next;
+       $a->{$k} = $_->{id} or next;
+    }
+    return $a ? $a : undef;
 }
 
 sub main {
     my $g = $dry_run ? Gcis::Client->new(url => $url)
                      : Gcis::Client->connect(url => $url);
-    my $cr = CrossRef->new;
     my $e = Errata->load($errata_file);
 
     my $r = Refs->new;
     $r->{n_max} = $max_references;
     $r->load($endnote_file);
+    my $ai = load_alt_ids($alt_id_file);
     my $n = $r->type_counts;
     say " endnote entries : ";
     my $n_tot = 0;
@@ -740,7 +810,7 @@ sub main {
         next unless $do_it;
         # say " ref :\n".Dumper($ref);
         say '';
-        import_article($g, $e, $cr, $ref) or next;
+        import_article($g, $e, $ai, $ref) or next;
         last if $max_updates > 0  &&  $n_updates >= $max_updates;
     }
     dump_diff;

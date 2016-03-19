@@ -58,9 +58,9 @@ sub _load_errata {
     my $file = shift or return undef;
 
     open my $f, '<:encoding(UTF-8)', $file or die "can't open file : $file";
-
     my $yml = do { local $/; <$f> };
     my $y = Load($yml);
+    close $f;
 
     my $e;
     ref $y eq 'ARRAY' or die "top level not a array";
