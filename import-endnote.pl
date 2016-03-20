@@ -67,9 +67,9 @@ Maximum number of references to read from the Endnote file
 
 Flag indicating journals are not to be added
 
-=item B<--do_not_add_articles>
+=item B<--do_not_add_items>
 
-Flag indicating articles are not to be added
+Flag indicating items (articles, web pages, etc.) are not to be added
 
 =item B<--do_not_add_references>
 
@@ -160,7 +160,7 @@ GetOptions(
     'max_updates=i'         => \(my $max_updates = 10),
     'max_references=i'      => \(my $max_references = 40),
     'do_not_add_journals'   => \(my $do_not_add_journals),
-    'do_not_add_articles'   => \(my $do_not_add_articles),
+    'do_not_add_items'      => \(my $do_not_add_items),
     'do_not_add_referneces' => \(my $do_not_add_references),
     'wait=i'                => \(my $wait = -1),
     'errata_file=s'         => \(my $errata_file),
@@ -206,7 +206,7 @@ say "   endnote_file : $endnote_file";
 say "   max_updates : $max_updates";
 say "   max_references : $max_references";
 say "   do_not_add_journals" if $do_not_add_journals;
-say "   do_not_add_articles" if $do_not_add_articles;
+say "   do_not_add_items" if $do_not_add_items;
 say "   do_not_add_referneces" if $do_not_add_references;
 say "   errata_file : $errata_file" if $errata_file;
 say "   diff_file : $diff_file";
@@ -376,16 +376,16 @@ sub add_item {
     delete $n->{uri};
     remove_undefs($n);
     $n_updates++;
-    $g->post("/$t", $n) or die " unable to add $t : $u";
+    my $i = $g->post("/$t", $n) or die " unable to add $t : $u";
     sleep($wait) if $wait > 0;
 
-    return 1;
+    return $i->{uri};
 }
 
 sub add_child_pub {
-    my ($g, $j) = @_;
+    my ($g, $b) = @_;
 
-    my $u = $j->{uri};
+    my $u = $b->{uri};
 
     if ($dry_run) {
         say " would add child pub : $u";
@@ -396,24 +396,24 @@ sub add_child_pub {
 
     say " adding child pub : $u";
     $stats{added_child_pub}++;
-    my $a = clone($j->{attrs});
+    my $a = clone($b->{attrs});
     remove_undefs($a);
     $n_updates++;
     $g->post($u, {
-        identifier => $j->{identifier},
+        identifier => $b->{identifier},
         attrs => $a,
-        child_publication_uri => $j->{child_publication_uri},
+        child_publication_uri => $b->{child_publication_uri},
         }) or die " unable to add child pub : $u";
     sleep($wait) if $wait > 0;
 
     return 1;
 }
 
-sub get_journal {
-    my ($g, $issn) = @_;
+sub find_item {
+    my ($g, $type, @q ) = @_;
     my @a;
-    for (@{ $issn }) {
-        @a = $g->get("/autocomplete?type=journal&q=$_") or next;
+    for (@q) {
+        @a = $g->get("/autocomplete?type=$type&q=$_") or next;
         last;
     }
     @a or return undef;
@@ -421,7 +421,7 @@ sub get_journal {
     my $r;
     for (@a) {
         my ($id) = ($_ =~ /\{(.*?)\}/);
-        my $uri = "/journal/$id";
+        my $uri = "/$type/$id";
         $r = $g->get($uri) or next;
         last;
     }
@@ -506,10 +506,14 @@ sub fix_alt_id {
 }
 
 sub import_article {
-    my ($g, $e, $ai, $r) = @_;
+    my $p = shift;
 
+    my $g = $p->{gcis};
+    my $e = $p->{errata};
+    my $r = $p->{ref};
     my $a;
-    # say " r :\n".Dumper($r);
+
+    say " ---";
     $a->{title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
         say " no title!";
         $stats{no_title}++;
@@ -522,7 +526,7 @@ sub import_article {
     my $url = $r->{urls}[0];
     my $id;
     $id->{doi} = $r->{doi}[0] if $r->{doi}[0];
-    fix_alt_id($ai, \%{ $id }, $url);
+    fix_alt_id($p->{alt_ids}, \%{ $id }, $url);
     if ($id->{doi}) {
         fix_doi($e, $id);
         $a->{doi} = $id->{doi};
@@ -536,7 +540,7 @@ sub import_article {
 
     my $c;
     if ($id->{doi}) {
-        return 0 if $skip_dois;
+        # return 0 if $skip_dois;
         my $cr = CrossRef->new;
         $c = $cr->get($a->{doi}) or do {
             say " doi not in crossref : $a->{doi}";
@@ -575,9 +579,10 @@ sub import_article {
     }
     $j->{print_issn} = $c->{issn}[0];
     $j->{online_issn} = $c->{issn}[1];
+    # next line should be: 
+    # $j->{publisher} = $r->{publisher}[0] ? $r->{publisher}[0] : $c->{publisher};
     $j->{publisher} = $a->{publisher} ? $a->{publisher} : $c->{publisher};
     $e->fix_errata($j);
-
     if (%test_jou) {
         return 0 unless $test_jou{$j->{identifier}};
     }
@@ -592,7 +597,7 @@ sub import_article {
                 $stats{no_journal_issn}++;
                 return 0;
             }
-            $jg = get_journal($g, $c->{issn});
+            $jg = find_item($g, 'journal', @{ $c->{issn} });
         }
     }
     if ($jg) {
@@ -631,6 +636,7 @@ sub import_article {
     $ac->{author} = xml_unescape(join '; ', @{ $r->{author} });
     $e->fix_errata($ac);
 
+
     my $ig = $e->diff_okay($ac);
     push @{ $ig }, qw(uri);
     my $d = compare($ac, $c, $ig);
@@ -652,7 +658,7 @@ sub import_article {
         }
         say " existing article same : $a->{uri}";
         $stats{existing_article_same}++;
-    } elsif (!$do_not_add_articles) {
+    } elsif (!$do_not_add_items) {
        add_item($g, $a) or return 0;
     } else {
        return 0;
@@ -698,6 +704,136 @@ sub import_article {
     my $b1 = $g->get($b->{uri});
     if ($b1) {
         fix_bib_issn($ba, $b1->{attrs}, $j);
+        my $ig = $e->diff_okay($b);
+        push @{ $ig }, qw(_record_number);
+        my $d = compare($b, $b1, $ig);
+        if ($d) {
+            say " existing reference different : $b->{uri}";
+            $stats{existing_reference_different}++;
+            return 0;
+        }
+        say " existing reference same : $b->{uri}";
+        $stats{existing_reference_same}++;
+        return 0 if $do_not_add_references  ||  $b1->{child_publication};
+    } elsif (!$do_not_add_references) {
+        add_item($g, $b) or return 0;
+    } else {
+        return 0;
+    }
+
+    $b->{child_publication_uri} = $a->{uri};
+    add_child_pub($g, $b) or return 0;
+
+    return 1;
+}
+
+sub import_webpage {
+    my $p = shift;
+
+    my $g = $p->{gcis};
+    my $e = $p->{errata};
+    my $r = $p->{ref};
+    my $type = $p->{type};
+
+    say " ---";
+
+    my $a;
+    $a->{title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
+        say " no title!";
+        $stats{no_title}++;
+        return 0;
+    };
+    my %a_map = (
+       year => 'access_date',
+       urls => 'url',
+    );
+    for (keys %a_map) {
+        next unless $r->{$_};
+        $a->{$a_map{$_}} = $r->{$_}[0];
+    }
+    delete $a->{access_date} if $a->{access_date} eq 'Undated';
+    $a->{access_date} .= "-01-01T00:00:00" if $a->{access_date};
+    
+    
+    $a->{uri} = "/$type/".make_identifier($a->{title});
+    $e->fix_errata($a);
+
+    say " web :\n".Dumper($a) if $verbose;
+
+    my $ag = find_item($g, $type, $a->{url});
+    if ($ag) {
+        my $ig = $e->diff_okay($a);
+        push @{ $ig }, qw(uri);
+        my $d = compare($a, $ag, $ig);
+        if ($d) {
+            say " existing $type different : $ag->{uri}";
+            $stats{"existing_".$type."_different"}++;
+            return 0;
+        }
+        say " existing $type same : $ag->{uri}";
+        $stats{"existing_".$type."_same"}++;
+        $a->{uri} = $ag->{uri};
+    } elsif (!$do_not_add_items) {
+       $a->{uri} = add_item($g, $a) or return 0;
+    } else {
+       return 0;
+    }
+
+    my $b;
+    $b->{identifier} = $r->{ref_key}[0];
+    $b->{uri} = "/reference/$b->{identifier}";
+    my $ba = \%{ $b->{attrs} };
+
+    my %bib_multi = (
+        author => 'Author', 
+        secondary_author => 'Secondary Author',
+        secondary_title => 'Secondary Title',
+        keywords => 'Keywords', 
+    );
+    for my $k (keys %bib_multi) {
+        next unless $r->{$k};
+        if ($k =~ /author/) {
+           ($_ =~ s/,$//) for @{ $r->{$k} };
+        }
+        $ba->{$bib_multi{$k}} = xml_unescape(join '; ', @{ $r->{$k} });
+    }
+
+    my %bib_map = (
+        pub_location     => 'Place Published',
+        abstract         => 'Abstract',
+        notes            => 'Notes',
+        language         => 'Language',
+        publisher        => 'Publisher',
+        volume           => 'Volume',
+        number           => 'Number',
+        page             => 'Pages', 
+        pub_date         => 'Date Published',
+        reftype_id       => '.reference_type',
+        record_number    => '_record_number',
+        ref_key          => '_uuid',
+    );
+    for (keys %bib_map) {
+        next unless $r->{$_};
+        $ba->{$bib_map{$_}} = $r->{$_}[0];
+    }
+    for (@{ $r->{notes} }) {
+       /^ *Ch\d+/ or next;
+       s/ //g;
+       $ba->{_chapter} = $_;
+    }
+
+    $ba->{Title} = $a->{title};
+    if ($a->{access_date}) {
+    }
+    $ba->{URL} = $a->{url};
+    $ba->{'.reference_type'} = 16;
+
+    $e->fix_errata($b);
+
+    say " bib :\n".Dumper($b) if $verbose;
+
+    my $b1 = $g->get($b->{uri});
+    if ($b1) {
         my $ig = $e->diff_okay($b);
         push @{ $ig }, qw(_record_number);
         my $d = compare($b, $b1, $ig);
@@ -776,14 +912,15 @@ sub load_alt_ids {
 }
 
 sub main {
-    my $g = $dry_run ? Gcis::Client->new(url => $url)
-                     : Gcis::Client->connect(url => $url);
-    my $e = Errata->load($errata_file);
+    my %p;
+    $p{gcis} = $dry_run ? Gcis::Client->new(url => $url)
+                        : Gcis::Client->connect(url => $url);
+    $p{errata} = Errata->load($errata_file);
 
     my $r = Refs->new;
     $r->{n_max} = $max_references;
     $r->load($endnote_file);
-    my $ai = load_alt_ids($alt_id_file);
+    $p{alt_ids} = load_alt_ids($alt_id_file);
     my $n = $r->type_counts;
     say " endnote entries : ";
     my $n_tot = 0;
@@ -792,25 +929,45 @@ sub main {
         $n_tot += $n->{$_};
     }
     say "   total : $n_tot";
+    say "";
 
-    for my $ref (@{ $r->{records} }) {
-        next unless $ref->{reftype}[0] eq 'Journal Article';
-        # say " doi : $ref->{doi}[0]";
+    my @ready = ('Journal Article', 'Web Page');
+    my %map = (
+       'Book' => 'book',
+       'Book Section' => 'book<section>', 
+       'Conference Paper' => 'generic', 
+       'Online Multimedia' => 'generic',
+       'Journal Article' => 'article',
+       'Legal Rule or Regulation' => 'generic', 
+       'Press Release' => 'generic', 
+       'Report' => 'report',
+       'Web Page' => 'webpage',
+    );
+    my @which = ('webpage');
+    for (@{ $r->{records} }) {
+        $p{ref} = $_;
+        $p{type} = $map{$_->{reftype}[0]} or 
+            die " type not known : $_->{reftype}[0]";
+        next unless grep $p{type} eq $_, @which;
+
         my $do_it = 1;
         if (keys %test) {
             $do_it = 0;
             for (keys %test) {
                 my $t = $test{$_};
-                next unless $ref->{$t}[0];
-                next unless $ref->{$t}[0] eq $_;
+                next unless $p{ref}->{$t}[0];
+                next unless $p{ref}->{$t}[0] eq $_;
                 $do_it = 1;
                 last;
             }
         }
         next unless $do_it;
-        # say " ref :\n".Dumper($ref);
-        say '';
-        import_article($g, $e, $ai, $ref) or next;
+
+        if ($p{type} eq 'article') {
+            import_article(\%p);
+        } elsif ($p{type} eq 'webpage') {
+            import_webpage(\%p);
+        }
         last if $max_updates > 0  &&  $n_updates >= $max_updates;
     }
     dump_diff;

@@ -65,11 +65,12 @@ sub _parse_record {
     my $s = shift;
     my $rec = shift;
     my %data;
-    for my $e (keys %elements) {
-        my $spec = $elements{$e};
+    for (keys %elements) {
+        my $spec = $elements{$_};
         my @found = (ref $spec eq 'CODE' ? $spec->($rec) : 
                      map $_->text, $rec->find($spec)->each);
-        $data{$e} = \@found;
+        next unless @found;
+        $data{$_} = \@found;
     }
     s/,(\S)/, $1/ for @{ $data{author} };
     return \%data;
