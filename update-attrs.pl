@@ -122,7 +122,9 @@ sub load_update {
         '_chapter', '_record_number', 
         'Issue', 'Type of Article', 'DOI',   
         'Department', 'Book Title', '_uuid', 
-        'Number of Pages', 'doi', 
+        'Number of Pages', 'doi', 'Publication Title', 
+        'Secondary Title', 'Notes', 'ISBN', 'Number', 
+        'Date Published', 
         );
 
     my $e;
