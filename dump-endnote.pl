@@ -6,6 +6,7 @@ use Pod::Usage qw/pod2usage/;
 use YAML;
 use Refs;
 use Data::Dumper;
+use Clone::PP qw(clone);
 
 use strict;
 use v5.14;
@@ -19,32 +20,48 @@ GetOptions(
 ) or die pod2usage(verbose => 1);
 
 my $max_references = -1;
+my $which = 'Report';
 
 my $n = 0;
 &main;
 
 sub main {
 
-    say " dumping endnote";
-    say "     file : $file";
+    say "---";
+    say "- endnote_dump: ~";
+    say "  file: $file";
+    say "  max_references: $max_references";
     say "";
 
     my $r = Refs->new;
     $r->{n_max} = $max_references;
     $r->load($file);
+    my $c;
+    my $o;
     for my $a (@{ $r->{records} }) {
+	my $t = $a->{reftype}[0];
+        if ($which) {
+           next unless $t eq $which;
+        }
+        $c->{total}->{n}++;
+        $c->{$t}->{n}++;
+        
         for (keys %{ $a }) {
             if (!@{ $a->{$_} }) {
                 delete $a->{$_};
                 next;
             }
+            $c->{$t}->{$_}++;
+            $c->{total}->{$_}++;
             my $n = @{ $a->{$_} };
             next if $n > 1;
             $a->{$_} = $a->{$_}[0];
         }
+        push @{ $o }, clone($a);
     }
 
-    say Dump($r->{records});
+    say Dump($o);
+    say Dump($c);
 
     return;
 }

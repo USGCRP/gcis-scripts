@@ -36,6 +36,14 @@ Chapter identifier, e.g. our-changing-climate
 
 Various log information is written to 'stdout'
 
+=item B<--update_all>
+
+Update all (including figures, findings, etc. in report)
+
+=item B<--add_report>
+
+Add references to report
+
 =item B<--max_updates>
 
 Maximum number of entries to update (defaults to 10;
@@ -80,6 +88,8 @@ GetOptions(
     'file=s'        => \(my $file), 
     'report=s'      => \(my $report), 
     'chapter=s'     => \(my $chapter), 
+    'update_all'    => \(my $update_all), 
+    'add_report'    => \(my $add_report), 
     'max_updates=i' => \(my $max_updates = 10),
     'verbose'       => \(my $verbose),
     'dry_run|n'     => \(my $dry_run),
@@ -94,6 +104,8 @@ say "   url : $url";
 say "   file : $file";
 say "   report : $report";
 say "   chapter : $chapter";
+say "   update_all $update_all" if $update_all;
+say "   add_report: $add_report" if $add_report;
 say "   max_updates: $max_updates" if $max_updates > 0;
 say "   verbose" if $verbose;
 say "   dry_run" if $dry_run;
@@ -166,20 +178,23 @@ sub main {
     my $c = $g->get($u) or 
         die " unable to get chapter $chapter for report $report";
 
-    my $uri = $c->{uri};
-    say " report and chapter exist : $uri";
+    my $r_uri = "/report/$report";
+    my $c_uri = $c->{uri};
+    say " report and chapter exist : $c_uri";
     say "";
 
-    my $n;
     for (@{ $y }) {
-        next unless $_->{type} eq 'chapter';
-        $n = $_->{references};
-        last;
+        if (!$update_all) {
+            next unless $_->{type} eq 'chapter';
+        }
+        my $n = $_->{references};
+        
+        for (@{ $n }) {
+            add_ref($g, $c_uri, $_);
+            add_ref($g, $r_uri, $_) if $add_report;
+            last if $max_updates > 0 && $n_updates >= $max_updates;
+        } 
     }
-    for (@{ $n }) {
-         add_ref($g, $uri, $_);
-         last if $max_updates > 0 && $n_updates >= $max_updates;
-    } 
 
     say "\n n update : $n_updates";
     for (sort keys %stats) {

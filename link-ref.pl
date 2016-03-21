@@ -167,7 +167,8 @@ sub main {
                      : Gcis::Client->connect(url => $url) or 
         die " unable to connect to $url";
 
-    my $f = $g->get("/report/$report/$what") or 
+    my $all = "?all=1";
+    my $f = $g->get("/report/$report/$what$all") or 
         die " unable to get $what for $report";
     my $nf = @{ $f };
     say " number of $what(s) : $nf\n";

@@ -413,6 +413,7 @@ sub find_item {
     my ($g, $type, @q ) = @_;
     my @a;
     for (@q) {
+        $_ or next;
         @a = $g->get("/autocomplete?type=$type&q=$_") or next;
         last;
     }
@@ -426,6 +427,32 @@ sub find_item {
         last;
     }
     return $r;
+}
+
+sub get_item {
+    my ($g, $type, $a ) = @_;
+
+    my $ag;
+    for (qw(doi url title other)) {
+        if ($_ ne 'other') {
+           next unless $a->{$_};
+           $ag = find_item($g, $type, $a->{$_});
+           last if $ag;
+           next;
+        }
+        for my $max_char (-1, 60, 40, 30) {
+            my $id = make_identifier($a->{title}, $max_char);
+            $ag = $g->get("/$type/$id");
+            last if $ag;
+        }
+    }
+    if (grep $type eq $_, qw(report)) {
+        my $id = $ag ? $ag->{identifier} :
+                       make_identifier($a->{title}, 60);
+        $a->{identifier} = $id;
+        $a->{uri} = "/$type/$id";
+    }
+    return $ag ? $ag : undef;
 }
 
 sub fix_jou_issn {
@@ -503,6 +530,60 @@ sub fix_alt_id {
      return 0 unless $k && $i;
      $id->{$k} = $i;
      return 1;
+}
+
+sub map_attrs {
+    my ($r, $ba) = @_;
+
+    my %bib_multi = (
+        author => 'Author',
+        keywords => 'Keywords',
+        secondary_author => 'Secondary Author',
+        secondary_title => 'Secondary Title',
+        pub_title => 'Publication Title', 
+    );
+    for my $k (keys %bib_multi) {
+        next unless $r->{$k};
+        if ($k =~ /author/) {
+           ($_ =~ s/,$//) for @{ $r->{$k} };
+        }
+        $ba->{$bib_multi{$k}} = xml_unescape(join '; ', @{ $r->{$k} });
+    }
+
+    my %bib_map = (
+        abstract      => 'Abstract',
+        doi           => 'DOI',
+        isbn          => 'ISBN',
+        language      => 'Language',
+        notes         => 'Notes',
+        number        => 'Number',
+        pages         => 'Pages',
+        pub_dates     => 'Date Published',
+        pub_location  => 'Place Published',
+        publisher     => 'Publisher',
+        record_number => '_record_number',
+        ref_key       => '_uuid',
+        reftype       => 'reftype',
+        reftype_id    => '.reference_type',
+        urls          => 'URL', 
+        volume        => 'Volume',
+        year          => 'Year',
+    );
+    for (keys %bib_map) {
+        next unless $r->{$_};
+        $ba->{$bib_map{$_}} = $r->{$_}[0];
+    }
+
+    for ($ba->{notes}) {
+       $_ or next;
+       /^ *Ch\d+/ or next;
+       s/^ *//;
+       s/ *$//;
+       $ba->{_chapter} = $_;
+       delete $ba->{notes} if $_ =~ /^ *Ch\d+ *$/;
+    }
+
+    return 1;
 }
 
 sub import_article {
@@ -727,7 +808,7 @@ sub import_article {
     return 1;
 }
 
-sub import_webpage {
+sub import_other {
     my $p = shift;
 
     my $g = $p->{gcis};
@@ -736,6 +817,7 @@ sub import_webpage {
     my $type = $p->{type};
 
     say " ---";
+    say " type : $type";
 
     my $a;
     $a->{title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
@@ -743,24 +825,43 @@ sub import_webpage {
         $stats{no_title}++;
         return 0;
     };
-    my %a_map = (
-       year => 'access_date',
-       urls => 'url',
-    );
-    for (keys %a_map) {
+
+    my $a_map = {
+        webpage => {
+            urls => 'url', 
+            year => 'access_date',
+        }, 
+        report => {
+            urls => 'url', 
+            doi  => 'doi', 
+            year => 'publication_year',
+            abstract => 'summary', 
+        },
+    };
+
+    my $at_map = $a_map->{$type} or 
+        die "unknown type : $type";
+    for (keys %{ $at_map }) {
         next unless $r->{$_};
-        $a->{$a_map{$_}} = $r->{$_}[0];
+        $a->{$at_map->{$_}} = $r->{$_}[0];
     }
-    delete $a->{access_date} if $a->{access_date} eq 'Undated';
-    $a->{access_date} .= "-01-01T00:00:00" if $a->{access_date};
-    
-    
+
+    if ($type eq 'webpage'  &&  $a->{access_date}) {
+       delete $a->{access_date} if $a->{access_date} eq 'Undated';
+       $a->{access_date} .= "-01-01T00:00:00" if $a->{access_date};
+    }
+    if ($type eq 'report'  &&  $a->{publication_year}) {
+       delete $a->{publication_year} if $a->{publication_year} eq 'n.d.';
+    }
+
     $a->{uri} = "/$type/".make_identifier($a->{title});
     $e->fix_errata($a);
 
-    say " web :\n".Dumper($a) if $verbose;
+    my $ag = get_item($g, $type, $a);
+    $e->fix_errata($a);
 
-    my $ag = find_item($g, $type, $a->{url});
+    say " item :\n".Dumper($a) if $verbose;
+
     if ($ag) {
         my $ig = $e->diff_okay($a);
         push @{ $ig }, qw(uri);
@@ -774,7 +875,7 @@ sub import_webpage {
         $stats{"existing_".$type."_same"}++;
         $a->{uri} = $ag->{uri};
     } elsif (!$do_not_add_items) {
-       $a->{uri} = add_item($g, $a) or return 0;
+        $a->{uri} = add_item($g, $a) or return 0;
     } else {
        return 0;
     }
@@ -784,49 +885,43 @@ sub import_webpage {
     $b->{uri} = "/reference/$b->{identifier}";
     my $ba = \%{ $b->{attrs} };
 
-    my %bib_multi = (
-        author => 'Author', 
-        secondary_author => 'Secondary Author',
-        secondary_title => 'Secondary Title',
-        keywords => 'Keywords', 
-    );
-    for my $k (keys %bib_multi) {
-        next unless $r->{$k};
-        if ($k =~ /author/) {
-           ($_ =~ s/,$//) for @{ $r->{$k} };
-        }
-        $ba->{$bib_multi{$k}} = xml_unescape(join '; ', @{ $r->{$k} });
-    }
-
-    my %bib_map = (
-        pub_location     => 'Place Published',
-        abstract         => 'Abstract',
-        notes            => 'Notes',
-        language         => 'Language',
-        publisher        => 'Publisher',
-        volume           => 'Volume',
-        number           => 'Number',
-        page             => 'Pages', 
-        pub_date         => 'Date Published',
-        reftype_id       => '.reference_type',
-        record_number    => '_record_number',
-        ref_key          => '_uuid',
-    );
-    for (keys %bib_map) {
-        next unless $r->{$_};
-        $ba->{$bib_map{$_}} = $r->{$_}[0];
-    }
-    for (@{ $r->{notes} }) {
-       /^ *Ch\d+/ or next;
-       s/ //g;
-       $ba->{_chapter} = $_;
-    }
+    map_attrs($r, $ba);
 
     $ba->{Title} = $a->{title};
-    if ($a->{access_date}) {
+
+    my $ba_map = {
+        webpage => {
+            url => 'URL',
+            access_date => 'Year',
+        },
+        report => {
+            url => 'URL',
+            doi  => 'DOI',
+            publication_year => 'Year',
+            summary => 'abstract',
+        },
+    };
+
+    my $bat_map = $ba_map->{$type};
+    for (keys %{ $bat_map }) {
+        my $bk = $bat_map->{$_};
+        if (!$a->{$_}) {
+            next unless $ba->{$bk};
+            delete $ba->{$bk};
+            next;
+        }
+        $ba->{$bk} = $a->{$_};
     }
-    $ba->{URL} = $a->{url};
-    $ba->{'.reference_type'} = 16;
+
+    if ($type eq 'webpage'  &&  $ba->{Year}) {
+        $ba->{Year} =~ s/^(\d{4}).*/$1/;
+    }
+
+    my %r_type = (
+       webpage => 16,
+       report => 10, 
+    );
+    $ba->{'.reference_type'} = $r_type{$type};
 
     $e->fix_errata($b);
 
@@ -931,7 +1026,7 @@ sub main {
     say "   total : $n_tot";
     say "";
 
-    my @ready = ('Journal Article', 'Web Page');
+    my @ready = ('Journal Article', 'Web Page', 'Report');
     my %map = (
        'Book' => 'book',
        'Book Section' => 'book<section>', 
@@ -943,7 +1038,7 @@ sub main {
        'Report' => 'report',
        'Web Page' => 'webpage',
     );
-    my @which = ('webpage');
+    my @which = qw(report);
     for (@{ $r->{records} }) {
         $p{ref} = $_;
         $p{type} = $map{$_->{reftype}[0]} or 
@@ -965,8 +1060,8 @@ sub main {
 
         if ($p{type} eq 'article') {
             import_article(\%p);
-        } elsif ($p{type} eq 'webpage') {
-            import_webpage(\%p);
+        } elsif (grep $p{type} eq $_, qw(webpage report)) {
+            import_other(\%p);
         }
         last if $max_updates > 0  &&  $n_updates >= $max_updates;
     }
