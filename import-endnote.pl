@@ -614,13 +614,15 @@ sub map_attrs {
         if ($k =~ /author/) {
            ($_ =~ s/,$//) for @{ $r->{$k} };
         }
-        $ba->{$bib_multi{$k}} = xml_unescape(join '; ', @{ $r->{$k} });
+        my $s = xml_unescape(join '; ', @{ $r->{$k} }) or next;
+        $ba->{$bib_multi{$k}} = $s;
     }
 
     my %bib_map = (
         abstract      => 'Abstract',
         doi           => 'DOI',
         isbn          => 'ISBN',
+        issn          => 'ISSN', 
         language      => 'Language',
         notes         => 'Notes',
         number        => 'Issue',
@@ -641,6 +643,7 @@ sub map_attrs {
         $ba->{$bib_map{$_}} = $r->{$_}[0];
     }
 
+    return 1 unless $ba->{Notes};
     for ($ba->{Notes}) {
        $_ or next;
        /^ *Ch\d+/ or next;
@@ -1090,6 +1093,133 @@ sub import_other {
     return 1;
 }
 
+sub import_bib_only {
+    my $p = shift;
+
+    my $g = $p->{gcis};
+    my $e = $p->{errata};
+    my $r = $p->{ref};
+    my $type = $p->{type};
+
+    say " ---";
+
+    my $b;
+    $b->{identifier} = $r->{ref_key}[0];
+    $b->{uri} = "/reference/$b->{identifier}";
+
+    my $ba = \%{ $b->{attrs} };
+
+    $ba->{Title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
+        say " no title!";
+        $stats{no_title}++;
+        return 0;
+    };
+
+    map_attrs($r, $ba);
+
+    my $ba_map = {
+        article => {
+            'Date Published' => 'Date',
+            'Publisher' => '.publisher',
+            'Publication Title' => undef,
+            'Secondary Title' => undef, 
+            'ISBN' => undef, 
+        },
+        book => {
+            'Issue' => 'Edition', 
+            'Pages' => 'Number of Pages',
+            'Secondary Author' => 'Editor', 
+        },
+        book_section => {
+            'Secondary Title' => 'Book Title', 
+            'Issue' => 'Edition',
+            'Secondary Author' => 'Editor',
+        },
+        generic_legal => {
+        },
+        generic_press => {
+        },
+        generic_media => {
+            'Secondary Title' => 'Periodical Title', 
+            'Date' => 'E-Pub Date', 
+        },
+        generic_cpaper => {
+            'Place Published' => 'Conference Location', 
+            'Secondary Title' => 'Conference Name', 
+            'Year' => 'Year of Conference',
+        },
+        report => {
+            'Issue' => 'Number', 
+        },
+        webpage => {
+            'Issue' => 'Number', 
+        },
+    };
+
+    my $bat_map = $ba_map->{$type};
+    for (keys %{ $bat_map }) {
+        if (!$bat_map->{$_}) {
+            next unless $ba->{$_};
+            delete $ba->{$_};
+            next;
+        }
+        my $bk = $bat_map->{$_};
+        if (!$ba->{$_}) {
+            next unless $ba->{$bk};
+            delete $ba->{$bk};
+            next;
+        }
+        $ba->{$bk} = $ba->{$_};
+        delete $ba->{$_};
+    }
+
+    my %r_type = (
+       article => 0,
+       book => 9, 
+       book_section => 7, 
+       generic_legal => 32, 
+       generic_press => 63,  
+       generic_media => 48, 
+       generic_cpaper => 47, 
+       report => 10, 
+       webpage => 16,
+    );
+    $ba->{'.reference_type'} = $r_type{$type};
+
+    $e->fix_errata($b);
+
+    say " bib :\n".Dumper($b) if $verbose;
+
+    my $b1 = $g->get($b->{uri});
+    if ($b1) {
+        my $ig = $e->diff_okay($b);
+        push @{ $ig }, qw(_record_number);
+        my $d = compare_hash($b, $b1, $ig);
+        if ($d) {
+            say " existing reference different : $b->{uri}";
+            $stats{existing_reference_different}++;
+            if (can_fix_item($d)  &&  $do_fix_items) {
+                say " can fix reference: $b->{uri}";
+                $stats{"can_fix_reference"}++;
+                fix_item($b, $b1, $ig);
+                my $d1 = compare_hash($b, $b1, $ig);
+                !$d1 or die "didn't fix reference!";
+                update_item($g, $b1);
+            } else {
+                $diff{$b->{uri}} = $d;
+                return 0;
+            }
+        } else {
+            say " existing reference same : $b->{uri}";
+            $stats{existing_reference_same}++;
+        }
+    } elsif (!$do_not_add_references) {
+        add_item($g, $b);
+    }
+
+    return 1;
+}
+
 sub format_diff {
     my ($k, $d) = @_;
     my $e;
@@ -1164,19 +1294,18 @@ sub main {
     say "   total : $n_tot";
     say "";
 
-    my @ready = ('Journal Article', 'Web Page', 'Report');
     my %map = (
        'Book' => 'book',
-       'Book Section' => 'book<section>', 
-       'Conference Paper' => 'generic', 
-       'Online Multimedia' => 'generic',
+       'Book Section' => 'book_section', 
+       'Conference Paper' => 'generic_cpaper', 
+       'Online Multimedia' => 'generic_media',
        'Journal Article' => 'article',
-       'Legal Rule or Regulation' => 'generic', 
-       'Press Release' => 'generic', 
+       'Legal Rule or Regulation' => 'generic_legal', 
+       'Press Release' => 'generic_press', 
        'Report' => 'report',
        'Web Page' => 'webpage',
     );
-    my @which = qw(article);
+    my @which = qw(article report webpage);
     for (@{ $r->{records} }) {
         $p{ref} = $_;
         $p{type} = $map{$_->{reftype}[0]} or 
@@ -1200,6 +1329,8 @@ sub main {
             import_article(\%p);
         } elsif (grep $p{type} eq $_, qw(webpage report)) {
             import_other(\%p);
+        } else {
+            import_bib_only(\%p);
         }
         last if $max_updates > 0  &&  $n_updates >= $max_updates;
     }

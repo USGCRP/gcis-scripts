@@ -15,14 +15,14 @@ use warnings;
 binmode STDOUT, ':encoding(utf8)';
 
 GetOptions(
-  'file=s'   => \(my $file), 
-  'help|?'      => sub { pod2usage(verbose => 2) },
+  'file=s'         => \(my $file), 
+  'type=s'         => \(my $type = 'all'), 
+  'max_references=i' => \(my $max_references = -1),
+  'help|?'         => sub { pod2usage(verbose => 2) },
 ) or die pod2usage(verbose => 1);
 
-my $max_references = -1;
-my $which = 'Report';
-
 my $n = 0;
+
 &main;
 
 sub main {
@@ -30,6 +30,7 @@ sub main {
     say "---";
     say "- endnote_dump: ~";
     say "  file: $file";
+    say "  type: $type";
     say "  max_references: $max_references";
     say "";
 
@@ -40,8 +41,8 @@ sub main {
     my $o;
     for my $a (@{ $r->{records} }) {
 	my $t = $a->{reftype}[0];
-        if ($which) {
-           next unless $t eq $which;
+        if ($type ne 'all') {
+           next unless $t eq $type;
         }
         $c->{total}->{n}++;
         $c->{$t}->{n}++;
@@ -92,6 +93,14 @@ Endnote file (xml format)
 =item B<stdout>
 
 Dump of endnote file (yaml format)
+
+=item B<--type>
+
+Type of reference to dump (e.g. 'Report'; default is 'all' : all references)
+
+=item B<--max_references>
+
+Maximumn number of references to dump (default is -1 : all references)
 
 =back
 

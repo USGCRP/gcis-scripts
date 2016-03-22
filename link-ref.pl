@@ -108,9 +108,13 @@ sub get_refs {
     for (@l) {
         next unless $f->{$_};
         my $dom = Mojo::DOM->new($f->{$_}) or next;
-        $r{$_}++ for $dom->find('tbib')->map('text')->each;
+        my @a = $dom->find('tbib')->map('text')->each;
+        for (@a) {
+            my @b = split /,/;
+            say " b :\n".Dumper(@b);
+            $r{$_}++ for @b;
+        }
     }
-    
     return %r ? \%r : undef;
 }
 
