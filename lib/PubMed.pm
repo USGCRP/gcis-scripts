@@ -17,7 +17,7 @@ sub new {
 }
 
 sub get {
-    my ($s, @id) = @_;
+    my ($s, $id) = @_;
 
     my $r1;
     my $id1;
@@ -29,10 +29,11 @@ sub get {
         su => 'MMWR Suppl', 
     );
     my $retmax = 50;
-    for (@id) {
+    for ($id) {
         $id1 = $_;
         $check_page = 0;
-        if ($id1 =~ /^.+\|.+\|.*\|.*$/) {
+        if ($id1 =~ /PMID-.+\|.+\|.*\|.*$/) {
+            $id1 =~ s/^PMID-//;
             my ($k, $v, $i);
             ($k, $v, $i, $check_page) = split /\|/,$id1;
             $report{$k} or next;
@@ -42,7 +43,11 @@ sub get {
             $id1 =~ s/ /+/g;
             $id1 =~ s/\[/%5b/g;
             $id1 =~ s/]/%5d/g;
-        } 
+        } elsif ($id1 =~ /^PMC-\d+$/) {
+            $id1 =~ s/-//;
+        } elsif ($id1 =~ /^pmid-\d+$/) {
+            $id1 =~ s/^pmid-//;
+        }
         my $q1 = "/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json".
                  "&retmax=$retmax&term=$id1";
         $r1 = $s->{gcis}->get($q1) or do {
@@ -54,8 +59,7 @@ sub get {
     }
 
     if ($n < 1  ||  ($n > 1  &&  !$check_page)) {
-        my $id_list = join ', ', @id;
-        say " no pubmed article for id(s) : $id_list";
+        say " no pubmed article for id : $id";
         return undef;
     }
 
@@ -78,16 +82,33 @@ sub get {
 sub alt_id {
     my ($url, $pg) = @_;
 
-    return undef unless $pg;
-    my ($id) = ($url =~ /^http:\/\/.*\.cdc\.gov\/.*\/(.*)\./);
-    return undef unless $id =~ /^[ms][msu]\d{2}.{2}/;
-    my ($j, $v, $i) = ($id =~ /^(.{2})(\d{2})(.{2})/);
-    ($v, $i) = ("$v Spec No", '') if ($i eq 'SP');
-    my ($p1, $p2) = split /-/, $pg;
-    $v =~ s/^0+//;
-    $i =~ s/^0+//;
-    my $id1 = "$j|$v|$i|$p1";
-    return $id1;
+    my $id;
+    my $t;
+    for ($url) {
+        $t = 'PMC';
+        ($id) = ($_ =~ /^http.*\/PMC(\d+)\//);
+        last if $id;
+        $t = 'pmid';
+        ($id) = ($_ =~ /^http.*\/pubmed\/(\d+)/);
+        last if $id;
+        $t = 'PMID';
+        ($id) = ($_ =~ /^http:\/\/.*\.cdc\.gov\/.*\/(.*)\./);
+        last if $id;
+        return undef;
+    }
+
+    if ($t eq 'PMID') {
+        return undef unless $pg;
+        return undef unless $id =~ /^[ms][msu]\d{2}.{2}/;
+        my ($j, $v, $i) = ($id =~ /^(.{2})(\d{2})(.{2})/);
+        ($v, $i) = ("$v Spec No", '') if ($i eq 'SP');
+        my ($p1, $p2) = split /-/, $pg;
+        $v =~ s/^0+//;
+        $i =~ s/^0+//;
+        $id = "$j|$v|$i|$p1";
+    }
+    $id = "$t-$id" unless $t eq 'pmid';
+    return $id;
 }
 
 sub _pages {

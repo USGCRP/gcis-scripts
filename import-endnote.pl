@@ -179,6 +179,13 @@ my %stats;
 my $skip_dois = 1;
 my $do_fix_items = 1;
 my %test;
+#     '36921a15-271d-48d7-b648-a481bde24a94' => 'ref_key',
+#     '87031b30-75fa-495d-8a99-0df6c5eb4ced' => 'ref_key', 
+#     'http://www.ncbi.nlm.nih.gov/pmc/articles/PMC1497432/pdf/12432132.pdf' => 'urls',
+#     'http://www.ncbi.nlm.nih.gov/pubmed/6475916' => 'urls', 
+#     'http://www.cdc.gov/mmwr/preview/mmwrhtml/mm6331a1.htm' => 'urls', 
+#     '10.1021/es900518z' => 'doi',
+#     'http://www.ewra.net/wuj/pdf/WUJ_2014_08_07.pdf' => 'urls', 
 #     '94694c3f-1703-4387-b6e7-114a8d04e3de' => 'ref_key',
 #     '10.1021/es900518z' => 'doi',
 #     'http://www.cdc.gov/pcd//issues/2008/jan/07_0135.htm' => 'urls', 
@@ -290,7 +297,7 @@ sub compare_hash {
         my $a1 = lc xml_unescape($a->{$_});
         my $b1 = lc xml_unescape($b->{$_});
         for ($a1, $b1) {
-            s/^\s+//; s/\s+$//; s/\.$//;
+            s/^\s+//; s/\s+$//; s/\.$//; s/\r/; /g;
         }
         next if $a1 eq $b1;
         if (lc $_ eq 'author') {
@@ -303,8 +310,6 @@ sub compare_hash {
 
 sub compare_author {
     my ($a, $b) = @_;
-    $a =~ s/\r/; /g;
-    $b =~ s/\r/; /g;
     my @a1 = split '; ', $a;
     my @b1 = split '; ', $b;
     for my $a2 (@a1) {
@@ -466,35 +471,39 @@ sub add_child_pub {
 }
 
 sub find_item {
-    my ($g, $type, @q ) = @_;
-    my @a;
-    for (@q) {
-        $_ or next;
-        @a = $g->get("/autocomplete?type=$type&q=$_") or next;
-        last;
-    }
-    @a or return undef;
+    my ($g, $type, $k, $q) = @_;
 
-    my $r;
-    for (@a) {
-        my ($id) = ($_ =~ /\{(.*?)\}/);
-        my $uri = "/$type/$id";
-        $r = $g->get($uri) or next;
-        last;
+    $q =~ s/ +/+/g;
+    my @a = $g->get("/search?&q=$q&type=$type") or return undef;
+
+    for my $e (@a) {
+        if ($e->{$k}) {       
+            return $e if $e->{$k} eq $q;
+        }
+        if ($k eq 'print_issn') {
+            next unless $e->{online_issn};
+            return $e if $e->{online_issn} eq $q;
+        } elsif ($k eq 'online_issn') {
+            next unless $e->{print_issn};
+            return $e if $e->{print_issn} eq $q;
+        } elsif ($k eq 'title') {
+            my $ai = make_identifier($e->{$k}) or next;
+            my $bi = make_identifier($q) or next;
+            return $e if $ai eq $bi;
+        }
     }
-    return $r;
+    return undef;
 }
 
 sub get_item {
     my ($g, $type, $a ) = @_;
 
     my $ag;
-    for (qw(doi url title other)) {
+    for (qw(doi print_issn online_issn url title other)) {
         if ($_ ne 'other') {
            next unless $a->{$_};
-           $ag = find_item($g, $type, $a->{$_});
+           $ag = find_item($g, $type, $_, $a->{$_});
            last if $ag;
-           next;
         }
         for my $max_char (-1, 60, 40, 30) {
             my $id = make_identifier($a->{title}, $max_char);
@@ -502,7 +511,7 @@ sub get_item {
             last if $ag;
         }
     }
-    if (grep $type eq $_, qw(report journal)) {
+    if (grep $type eq $_, qw(report journal article)) {
         my $id = $ag ? $ag->{identifier} :
                        make_identifier($a->{title}, 60);
         $a->{identifier} = $id;
@@ -560,6 +569,7 @@ sub fix_bib_issn {
     my @i = ($j->{online_issn}, $j->{print_issn});
     return 0 unless @i > 1;
     for (@i) {
+        next unless $b1->{ISSN};
         next unless $_ eq $b1->{ISSN};
         $ba->{ISSN} = $b1->{ISSN};
         return 1;
@@ -667,7 +677,6 @@ sub import_article {
         year   => 'year',
         volume => 'journal_vol',
         pages  => 'journal_pages',
-        urls   => 'urls',
     };
     for (keys %{ $a_map }) {
         next unless $r->{$_};
@@ -681,7 +690,6 @@ sub import_article {
         $a->{pmid} = PubMed::alt_id($a->{url}, $r->{pages}[0]) or do {
             say " no doi or alternate id : $a->{title}";
             $stats{no_doi_or_alternate_id}++;
-            return 0;
         };
     }
 
@@ -702,6 +710,8 @@ sub import_article {
             return 0;
        };
        $a->{identifier} = 'pmid-'.$c->{pmid};
+    } else {
+       $c = get_item($g, 'article', $a);
     }
     $a->{uri} = "/article/$a->{identifier}";
 
@@ -712,11 +722,9 @@ sub import_article {
         return 0;
     };
 
-    my $jg = get_item($g, 'journal', $j);
     $j->{print_issn} = $c->{issn}[0];
     $j->{online_issn} = $c->{issn}[1];
-    $j->{publisher} = $r->{publisher}[0] ? $r->{publisher}[0] : $c->{publisher};
-    $e->fix_errata($j);
+    $j->{publisher} = $c->{publisher};
 
     if (%test_jou) {
         return 0 unless $test_jou{$j->{identifier}};
@@ -724,17 +732,21 @@ sub import_article {
 
     say " jou :\n".Dumper($j) if $verbose;
 
+    my $jg = get_item($g, 'journal', $j);
+    $e->fix_errata($j);
+
     if (!$jg) {
-        $jg = $g->get($j->{uri});
-        if (!$jg) {
-            if (!$j->{print_issn}  &&  !$j->{online_issn}) {
-                say " no journal issn : $j->{uri}";
-                $stats{no_journal_issn}++;
-                return 0;
-            }
-            $jg = find_item($g, 'journal', @{ $c->{issn} });
+        if (!$j->{print_issn}  &&  !$j->{online_issn}) {
+            say " no journal issn : $j->{uri}";
+            $stats{no_journal_issn}++;
+            return 0;
         }
     }
+
+    if (%test_jou) {
+        return 0 unless $test_jou{$j->{identifier}};
+    }
+
     if ($jg) {
         fix_jou_issn($j, $jg);
         my $ig = $e->diff_okay($j);
