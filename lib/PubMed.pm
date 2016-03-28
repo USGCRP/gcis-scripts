@@ -27,6 +27,7 @@ sub get {
         ss => 'MMWR Surveill Summ',
         mm => 'MMWR Morb Mortal Wkly Rep', 
         su => 'MMWR Suppl', 
+        msmr => 'MSMR', 
     );
     my $retmax = 50;
     for ($id) {
@@ -91,13 +92,16 @@ sub alt_id {
         $t = 'pmid';
         ($id) = ($_ =~ /^http.*\/pubmed\/(\d+)/);
         last if $id;
-        $t = 'PMID';
+        $t = 'PMID1';
         ($id) = ($_ =~ /^http:\/\/.*\.cdc\.gov\/.*\/(.*)\./);
+        last if $id;
+        $t = 'PMID2'; 
+        ($id) = ($_ =~ /^http.*\.afhsc\.mil\/.*\/msmrs\/\d{4}\/(.*)\./);
         last if $id;
         return undef;
     }
 
-    if ($t eq 'PMID') {
+    if ($t eq 'PMID1') {
         return undef unless $pg;
         return undef unless $id =~ /^[ms][msu]\d{2}.{2}/;
         my ($j, $v, $i) = ($id =~ /^(.{2})(\d{2})(.{2})/);
@@ -106,6 +110,16 @@ sub alt_id {
         $v =~ s/^0+//;
         $i =~ s/^0+//;
         $id = "$j|$v|$i|$p1";
+        $t = 'PMID';
+    } elsif ($t eq 'PMID2') {
+        return undef unless $pg;
+        return undef unless $id =~ /^v\d{1,2}_n\d{1,2}/;
+        my ($v, $i) = ($id =~ /^v(\d{2})_n(\d{1,2})/);
+        my ($p1, $p2) = split /-/, $pg;
+        $v =~ s/^0+//;
+        $i =~ s/^0+//;
+        $id = "msmr|$v|$i|$p1";
+        $t = 'PMID';
     }
     $id = "$t-$id" unless $t eq 'pmid';
     return $id;

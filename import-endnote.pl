@@ -146,6 +146,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Time::HiRes qw(usleep);
 use PubMed;
+use Utils;
 
 use strict;
 use v5.14;
@@ -179,6 +180,9 @@ my %stats;
 my $skip_dois = 1;
 my $do_fix_items = 1;
 my %test;
+#     'efc237f2-b939-4902-b7c5-78c8b6249ffe' => 'ref_key', 
+#     '25c22917-41da-4f27-82db-1d40c3b4f677' => 'ref_key',
+#     '10.3354/cr027177' => 'doi', 
 #     '36921a15-271d-48d7-b648-a481bde24a94' => 'ref_key',
 #     '87031b30-75fa-495d-8a99-0df6c5eb4ced' => 'ref_key', 
 #     'http://www.ncbi.nlm.nih.gov/pmc/articles/PMC1497432/pdf/12432132.pdf' => 'urls',
@@ -204,6 +208,7 @@ my %test;
 #     '10.1001/archinternmed.2011.683' => 'doi',
 #     '197d65cd-c05e-4ddb-8a9d-5a9aed134974' => 'ref_key',
 my %test_jou;
+#     'disaster-medicine-public' => 'journal',
 #     'international-journal-environmental-research--public-health' => 'journal',
 #     'philosophical-transactions-royal-society-b-biological-sciences' => 'journal', 
 #     'philosophical-transactions-royal-society-a-mathematical-physical-and-engineering-sciences' => 'journal', 
@@ -275,10 +280,9 @@ sub make_identifier {
 sub compare_hash {
     my ($a, $b, $i) = @_;
 
-    my %i1 = map { $_ => 1 } @{ $i };
     my %c;
     for (keys %{ $a }) {
-        next if $i1{$_};
+        next if $i->{$_};
         next if !defined $a->{$_}  &&  !defined $b->{$_};
         if (!defined $b->{$_}) {
            $c{$_} = {_A_ => $a->{$_}, _B_ => undef};
@@ -339,21 +343,6 @@ sub remove_undefs {
     return 1;
 }
 
-sub fix_identifier {
-    my $r = shift;
-
-    return 1 unless $r->{identifier};
-    my %list = (
-        '<' => '%3C', '>' => '%3E', 
-        '\[' => '%5B', '\]' => '%5D', 
-        );
-    for (keys %list) {
-        $r->{identifier} =~ s/$_/$list{$_}/g;
-    }
-
-    return 1;
-}
-
 sub update_item {
     my ($g, $j) = @_;
 
@@ -370,13 +359,13 @@ sub update_item {
     say " updating $t : $u";
     $stats{"updated_$t"}++;
     my $n = clone($j);
-    delete $n->{uri};
     remove_undefs($n);
-    my @extra = qw(articles chapters child_publication
-                   cited_by contributors files 
-                   href parents publications 
-                   references report_figures report_findings
-                   report_tables);
+    delete $n->{uri};
+    my @extra = qw(articles child_publication cited_by 
+                   contributors files href 
+                   parents publications references);
+    push @extra, qw(chapters report_figures 
+                    report_findings report_tables) if $t eq 'report';
     for (@extra) {
         delete $n->{$_} if $n->{$_};
     }
@@ -403,8 +392,11 @@ sub add_item {
     say " adding $t : $u";
     $stats{"added_$t"}++;
     my $n = clone($j);
-    delete $n->{uri};
     remove_undefs($n);
+    delete $n->{uri};
+    if ($t eq 'article') {
+        delete $n->{$_} for qw(uri author pmid);
+    }
     $n_updates++;
     my $i = $g->post("/$t", $n) or die " unable to add $t : $u";
     sleep($wait) if $wait > 0;
@@ -429,9 +421,8 @@ sub can_fix_item {
 
 sub fix_item {
     my ($a, $b, $i) = @_;
-    my %i1 = map { $_ => 1 } @{ $i };
     for (keys %{ $a }) {
-        next if $i1{$_};
+        next if $i->{$_};
         if (ref $a->{$_} eq 'HASH') {
             fix_item($a->{$_}, $b->{$_}, $i);
             next;
@@ -473,8 +464,14 @@ sub add_child_pub {
 sub find_item {
     my ($g, $type, $k, $q) = @_;
 
-    $q =~ s/ +/+/g;
-    my @a = $g->get("/search?&q=$q&type=$type") or return undef;
+    my $qs = $q;
+    $qs = Utils::url_unescape($qs) if $k eq 'url';
+    if ($k eq 'title') {
+        $qs = Utils::strip_title($qs);
+        $qs = Utils::url_unescape($qs);
+    }
+    $qs =~ s/ +/+/g;
+    my @a = $g->get("/search?&q=$qs&type=$type") or return undef;
 
     for my $e (@a) {
         if ($e->{$k}) {       
@@ -490,6 +487,10 @@ sub find_item {
             my $ai = make_identifier($e->{$k}) or next;
             my $bi = make_identifier($q) or next;
             return $e if $ai eq $bi;
+        } elsif ($k eq 'url') {
+            my $ai = Utils::url_escape($e->{$k}) or next;
+            my $bi = Utils::url_escape($q) or next;
+            return $e if $ai eq $bi;
         }
     }
     return undef;
@@ -499,10 +500,10 @@ sub get_item {
     my ($g, $type, $a ) = @_;
 
     my $ag;
-    for (qw(doi print_issn online_issn url title other)) {
-        if ($_ ne 'other') {
-           next unless $a->{$_};
-           $ag = find_item($g, $type, $_, $a->{$_});
+    for my $i (qw(doi print_issn online_issn url title other)) {
+        if ($i ne 'other') {
+           next unless $a->{$i};
+           $ag = find_item($g, $type, $i, $a->{$i});
            last if $ag;
         }
         for my $max_char (-1, 60, 40, 30) {
@@ -566,7 +567,9 @@ sub fix_bib_issn {
     return 0 unless $b1->{ISSN};
     return 0 if $ba->{ISSN} eq $b1->{ISSN};
 
-    my @i = ($j->{online_issn}, $j->{print_issn});
+    my @i;
+    push @i, $j->{online_issn} if $j->{online_issn};
+    push @i, $j->{print_issn} if $j->{print_issn};
     return 0 unless @i > 1;
     for (@i) {
         next unless $b1->{ISSN};
@@ -665,6 +668,7 @@ sub import_article {
     my $a;
 
     say " ---";
+    $stats{n_article}++;
     $a->{title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
         say " no title!";
         $stats{no_title}++;
@@ -685,6 +689,7 @@ sub import_article {
         next unless $r->{$_};
         $a->{$a_map->{$_}} = $r->{$_}[0];
     }
+    $a->{author} = xml_unescape(join '; ', @{ $r->{author} });
 
     fix_alt_id($p->{alt_ids}, \%{ $a });
     if ($a->{doi}) {
@@ -697,6 +702,7 @@ sub import_article {
     }
 
     my $c;
+    my $check_external = 0;
     if ($a->{doi}) {
         my $cr = CrossRef->new;
         $c = $cr->get($a->{doi}) or do {
@@ -704,6 +710,7 @@ sub import_article {
             $stats{doi_not_in_crossref}++;
             return 0;
        };
+       $check_external = 1;
        $a->{identifier} = $a->{doi};
     } elsif ($a->{pmid}) {
        my $pm = PubMed->new;
@@ -712,7 +719,9 @@ sub import_article {
             $stats{id_not_in_pubmed}++;
             return 0;
        };
+       $check_external = 1;
        $a->{identifier} = 'pmid-'.$c->{pmid};
+       $a->{pmid} = $c->{pmid};
     } else {
        $c = get_item($g, 'article', $a);
     }
@@ -729,14 +738,10 @@ sub import_article {
     $j->{online_issn} = $c->{issn}[1];
     $j->{publisher} = $c->{publisher};
 
-    if (%test_jou) {
-        return 0 unless $test_jou{$j->{identifier}};
-    }
-
-    say " jou :\n".Dumper($j) if $verbose;
-
     my $jg = get_item($g, 'journal', $j);
     $e->fix_errata($j);
+
+    say " jou :\n".Dumper($j) if $verbose;
 
     if (!$jg) {
         if (!$j->{print_issn}  &&  !$j->{online_issn}) {
@@ -763,7 +768,7 @@ sub import_article {
                 fix_item($j, $jg, $ig);
                 my $d1 = compare_hash($j, $jg, $ig);
                 !$d1 or die "didn't fix journal!";
-                update_item($j, $jg);
+                update_item($g, $jg);
                 $j->{uri} = $jg->{uri};
             } else {
                 $diff{$j->{uri}} = $d;
@@ -780,33 +785,26 @@ sub import_article {
     }
 
     $a->{journal_identifier} = $j->{identifier};
-    delete $a->{pmid} if $a->{pmid};
     $e->fix_errata($a);
 
     say " art :\n".Dumper($a) if $verbose;
 
-    my $ac;
-    for (qw(uri doi title year journal_vol journal_pages)) {
-         next unless $a->{$_};
-         $ac->{$_} = $a->{$_};
-    }
-    $ac->{author} = xml_unescape(join '; ', @{ $r->{author} });
-    $e->fix_errata($ac);
-
-    my $ig = $e->diff_okay($ac);
-    push @{ $ig }, qw(uri);
-    my $d = compare_hash($ac, $c, $ig);
-    if ($d) {
-        $diff{$a->{uri}} = $d;
-        say " external source article different : $a->{uri}";
-        $stats{external_source_article_different}++;
-        return 0;
+    if ($check_external) {
+        my $ig = $e->diff_okay($a);
+        $ig->{$_} = 1 for qw(uri identifier journal_identifier url);
+        my $d = compare_hash($a, $c, $ig);
+        if ($d) {
+            $diff{$a->{uri}} = $d;
+            say " external source article different : $a->{uri}";
+            $stats{external_source_article_different}++;
+           return 0;
+        }
     }
 
     my $ag = $g->get($a->{uri});
     if ($ag) {
-        my $ig = $e->diff_okay($ac);
-        push @{ $ig }, qw(uri);
+        my $ig = $e->diff_okay($a);
+        $ig->{$_} = 1 for qw(uri author pmid);
         my $d = compare_hash($a, $ag, $ig);
         if ($d) {
             say " existing article different : $a->{uri}";
@@ -854,31 +852,29 @@ sub import_article {
         delete $ba->{$_};
     }
 
-    $ba->{Title} = $a->{title};
-
     my $ba_map = {
+        author        => 'Author', 
+        title         => 'Title', 
         url           => 'URL',
         doi           => 'DOI',
         journal_pages => 'Pages', 
         journal_vol   => 'Volume',
         year          => 'Year', 
+        pmid          => 'PMID', 
     };
     for (keys %{ $ba_map }) {
         my $bk = $ba_map->{$_};
-        if (!$a->{$_}) {
+        if (!defined $a->{$_}) {
             next unless $ba->{$bk};
             delete $ba->{$bk};
             next;
         }
         $ba->{$bk} = $a->{$_};
     }
-    $ba->{PMID} = $c->{pmid} if $c->{pmid};
 
     $ba->{'.reference_type'} = 0;
-
     $ba->{ISSN} = $j->{online_issn} ? $j->{online_issn} : $j->{print_issn};
     $ba->{Journal} = $j->{title};
-    $ba->{Author} = $ac->{author};
 
     $e->fix_errata($b);
 
@@ -887,8 +883,8 @@ sub import_article {
     my $b1 = $g->get($b->{uri});
     if ($b1) {
         fix_bib_issn($ba, $b1->{attrs}, $j);
-        $ig = $e->diff_okay($b);
-        push @{ $ig }, qw(_record_number);
+        my $ig = $e->diff_okay($b);
+        $ig->{_record_number} = 1;
         my $d = compare_hash($b, $b1, $ig);
         if ($d) {
             say " existing reference different : $b->{uri}";
@@ -933,7 +929,7 @@ sub import_other {
     my $type = $p->{type};
 
     say " ---";
-
+    $stats{"n_$type"}++;
     my $a;
     $a->{title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
         say " no title!";
@@ -979,7 +975,7 @@ sub import_other {
 
     if ($ag) {
         my $ig = $e->diff_okay($a);
-        push @{ $ig }, qw(uri);
+        $ig->{uri} = 1;
         my $d = compare_hash($a, $ag, $ig);
         if ($d) {
             say " existing $type different : $ag->{uri}";
@@ -1032,12 +1028,16 @@ sub import_other {
     my $bat_map = $ba_map->{$type};
     for (keys %{ $bat_map }) {
         my $bk = $bat_map->{$_};
-        if (!$a->{$_}) {
-            next unless $ba->{$bk};
+        if (!defined $a->{$_}) {
+            next unless defined $ba->{$bk};
             delete $ba->{$bk};
             next;
         }
         $ba->{$bk} = $a->{$_};
+    }
+    if (defined $ba->{Issue}) {
+         $ba->{Number} = $ba->{Issue};
+         delete $ba->{Issue};
     }
 
     if ($type eq 'webpage'  &&  $ba->{Year}) {
@@ -1057,7 +1057,7 @@ sub import_other {
     my $b1 = $g->get($b->{uri});
     if ($b1) {
         my $ig = $e->diff_okay($b);
-        push @{ $ig }, qw(_record_number);
+        $ig->{_record_number} = 1;
         my $d = compare_hash($b, $b1, $ig);
         if ($d) {
             say " existing reference different : $b->{uri}";
@@ -1102,7 +1102,7 @@ sub import_bib_only {
     my $type = $p->{type};
 
     say " ---";
-
+    $stats{"n_$type"}++;
     my $b;
     $b->{identifier} = $r->{ref_key}[0];
     $b->{uri} = "/reference/$b->{identifier}";
@@ -1158,14 +1158,14 @@ sub import_bib_only {
 
     my $bat_map = $ba_map->{$type};
     for (keys %{ $bat_map }) {
-        if (!$bat_map->{$_}) {
-            next unless $ba->{$_};
+        if (!defined $bat_map->{$_}) {
+            next unless defined $ba->{$_};
             delete $ba->{$_};
             next;
         }
         my $bk = $bat_map->{$_};
-        if (!$ba->{$_}) {
-            next unless $ba->{$bk};
+        if (!defined $ba->{$_}) {
+            next unless defined $ba->{$bk};
             delete $ba->{$bk};
             next;
         }
@@ -1193,7 +1193,7 @@ sub import_bib_only {
     my $b1 = $g->get($b->{uri});
     if ($b1) {
         my $ig = $e->diff_okay($b);
-        push @{ $ig }, qw(_record_number);
+        $ig->{_record_number} = 1;
         my $d = compare_hash($b, $b1, $ig);
         if ($d) {
             say " existing reference different : $b->{uri}";
@@ -1306,11 +1306,14 @@ sub main {
        'Web Page' => 'webpage',
     );
     my @which = qw(article report webpage);
+    my $bib_only = 0;
+    my $do_all = 0;
     for (@{ $r->{records} }) {
         $p{ref} = $_;
         $p{type} = $map{$_->{reftype}[0]} or 
             die " type not known : $_->{reftype}[0]";
-        next unless grep $p{type} eq $_, @which;
+        next unless $do_all || (grep $p{type} eq $_, @which);
+                    
 
         my $do_it = 1;
         if (keys %test) {
@@ -1325,9 +1328,9 @@ sub main {
         }
         next unless $do_it;
 
-        if ($p{type} eq 'article') {
+        if ($p{type} eq 'article'  &&  !$bib_only) {
             import_article(\%p);
-        } elsif (grep $p{type} eq $_, qw(webpage report)) {
+        } elsif ((grep $p{type} eq $_, qw(webpage report))  && !$bib_only) {
             import_other(\%p);
         } else {
             import_bib_only(\%p);
