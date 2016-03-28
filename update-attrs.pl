@@ -99,6 +99,7 @@ sub main {
         say " uri: $u->{uri}";
         say "   u :\n".Dumper($u) if $verbose;
         update_ref($g, $u);
+        last if $max_updates >= 0  &&  $n_updates >= $max_updates;
     }
     say " done";
 }
@@ -178,6 +179,7 @@ sub update_ref {
 
     if ($dry_run) {
         say "   would update reference for : $uri";
+        $n_updates++;
         return 0;
     }
 

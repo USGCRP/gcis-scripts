@@ -86,14 +86,17 @@ sub main {
         my $u = $_ or next;
         $u =~ /^\/$type/ or next;
         my $r = $e->{e}->{$u};
-        my $i = $r->{$field} or next;
-        if ($subfield) {
-            next unless $r->{$field}->{$subfield};
-            $i = $r->{$field}->{$subfield};
+        for (@{ $r }) {
+            next unless defined $_->{$field};
+            my $i = $_->{$field};
+            if ($subfield) {
+                next unless defined $i->{$subfield};
+                $i = $i->{$subfield};
+            }
+            my $a = defined $i->{alias} ? $i->{alias} : 'undef';
+            my $b = defined $i->{value} ? $i->{value} : 'undef';
+            say "$u\t$a\t$b";
         }
-        my $a = $i->{alias} ? $i->{alias} : 'undef';
-        my $b = $i->{value} ? $i->{value} : 'undef';
-        say "$u\t$a\t$b";
     }
 
     exit;
