@@ -125,7 +125,7 @@ sub load_update {
         'Department', 'Book Title', '_uuid', 
         'Number of Pages', 'doi', 'Publication Title', 
         'Secondary Title', 'Notes', 'ISBN', 'Number', 
-        'Date Published', 
+        'Date Published', 'Secondary Author', 
         );
 
     my $e;
