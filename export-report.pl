@@ -18,6 +18,7 @@ GetOptions(
   'log_file=s'  => \(my $log_file = '/tmp/gcis-export.log'),
   'log_level=s' => \(my $log_level = "info"),
   'report=s'    => \(my $report),
+  'file=s'      => \(my $file),
   'not_all'     => \(my $not_all),
 );
 
@@ -40,7 +41,7 @@ sub main {
 
     $e->get_full_report($rep->{uri});
 
-    $e->dump;
+    $e->dump($file);
     $e->logger_info('done');
 }
 
@@ -79,6 +80,10 @@ Log level (see Mojo::Log)
 =item B<--report>
 
 Report unique identifier
+
+=item B<--file>
+
+Output file (yaml format)
 
 =item B<--not_all>
 

@@ -70,32 +70,37 @@ sub main {
 #   2. import/map journals/publications (except actual report)
 #   3. import/map datasets
 #   4. import/link report, chapters, figures, images, tables, arrrays, 
-#                  findings, references, activities
+#                  findings, activities, references
 #   5. import/link files
 #   6. link contributors, parents
 
-    import_resource($b, $a, $_) for qw(
+    for (qw(
         organizations
         people
         journals
         publications
         datasets
-        );
-
+        )) {
+        import_resource($b, $a, $_);
+        return 0 if $max_import > 0  &&  $n > $max_import;
+    }
     say " importing report";
     $b->import_report($a);
     say "";
 
-    import_resource($b, $a, $_) for qw(
+    for (qw(
         chapters
         images
         figures
         arrays
         tables
         findings
-        references
         activities
-        );
+        references
+        )) {
+        import_resource($b, $a, $_);
+        return 0 if $max_import > 0  &&  $n > $max_import;
+    }
 
     for (qw(
         reports
@@ -111,11 +116,13 @@ sub main {
         )) {
         import_files($b, $a, $_);
         link_resource($b, $a, $_);
+        return 0 if $max_import > 0  &&  $n > $max_import;
     }
 
     $b->logger_info("done");
+    say " done";
 
-    return;
+    return 1;
 }
 
 sub import_resource {
@@ -126,9 +133,9 @@ sub import_resource {
 
     my $sub = \&{"Exim::import_".$type};
 
-    for (keys %{ $a->{$types} }) {
+    for (sort keys %{ $a->{$types} }) {
         $n++;
-        last if $n > $max_import;
+        last if $max_import > 0  &&  $n > $max_import;
         my $obj = $a->{$types}->{$_};
         say " obj $n : $obj->{uri}";
         $b->$sub($obj);
@@ -144,9 +151,9 @@ sub import_files {
     say " importing files for $types\n";
     my $report_uri = $a->{report_uri};
 
-    for (keys %{ $a->{$types} }) {
+    for (sort keys %{ $a->{$types} }) {
         $n++;
-        last if $n > $max_import;
+        last if $max_import > 0  &&  $n > $max_import;
         my $obj = $a->{$types}->{$_};
         say " files for $n : $obj->{uri}";
         $b->import_files($type, $obj, $a);
@@ -162,9 +169,9 @@ sub link_resource {
     say " linking $types\n";
     my $report_uri = $a->{report_uri};
 
-    for (keys %{ $a->{$types} }) {
+    for (sort keys %{ $a->{$types} }) {
         $n++;
-        last if $n > $max_import;
+        last if $max_import > 0  &&  $n > $max_import;
         my $obj = $a->{$types}->{$_};
         say " link $n : $obj->{uri}";
         $b->link_contributors($type, $obj, $a->{contributors});

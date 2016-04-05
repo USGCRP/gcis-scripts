@@ -65,6 +65,7 @@ my @has_relatives = (qw(
     @publication_types);
 
 my @common_ignore_src_items = qw(
+    cited_by
     contributor_uris
     file_uris
     parents
@@ -72,6 +73,7 @@ my @common_ignore_src_items = qw(
     );
 
 my @common_ignore_dst_items = qw(
+    cited_by
     contributors
     files
     parents
@@ -120,15 +122,18 @@ sub compare_hash {
 
     my %v;
     for my $k (keys %$a) {
-        next if exists $b->{$k};
+        next unless defined $a->{$k};
+        next if defined $b->{$k};
         $v{$k} = 'src_only';
     }
     for my $k (keys %$b) {
-        next if exists $a->{$k};
+        next unless defined $b->{$k};
+        next if defined $a->{$k};
         $v{$k} = 'dst_only';
+
     }
 
-    my @common_keys = grep exists($b->{$_}), keys %$a;
+    my @common_keys = grep defined $b->{$_}, keys %$a;
     for my $k (@common_keys) {
 
         if (ref $a->{$k} eq 'ARRAY') {
@@ -182,7 +187,7 @@ sub _compare_array {
         findings => 'uri',
         references => 'uri',
         files => 'uri',
-        publications => 'uri',
+        publications => '',
         articles => 'uri',
         chapter_uris => '',
         figure_uris => '',
@@ -194,10 +199,12 @@ sub _compare_array {
         contributor_uris => '',
         publication_maps => 'activity_identifier',
         parents => 'label',
+        aliases => '', 
         contributors => 'id',
         sub_publication_uris => '',
         kindred_figures => '',
         rows => '',
+        children => 'id', 
         instrument_measurements => 'instrument_identifier', 
     );
 
@@ -207,28 +214,29 @@ sub _compare_array {
         my %a_objs;
         my %b_objs;
         if ($array ne 'publication_maps') {
-          %a_objs = map {$_->{$id} => $_} @{ $a };
-          %b_objs = map {$_->{$id} => $_} @{ $b };
+            %a_objs = map {$_->{$id} => $_} @{ $a };
+            %b_objs = map {$_->{$id} => $_} @{ $b };
         } else {
-          %a_objs = map {$_->{$id}."|".$_->{parent_uri}."|".$_->{child_uri} => $_}
-                         @{ $a };
-          %b_objs = map {$_->{$id}."|".$_->{parent_uri}."|".$_->{child_uri} => $_}                         @{ $b };
+            %a_objs = map {$_->{$id}."|".$_->{parent_uri}."|".$_->{child_uri} 
+                           => $_} @{ $a };
+            %b_objs = map {$_->{$id}."|".$_->{parent_uri}."|".$_->{child_uri} 
+                           => $_} @{ $b };
         }
 
         my $m = 0;
         for (keys %a_objs) {
-            next if exists $b_objs{$_};
+            next if defined $b_objs{$_};
             $v[$m]->{_location} = 'src_only';
             $v[$m]->{$id} = $_;
             $m++;
         }
         for (keys %b_objs) {
-            next if exists $a_objs{$_};
+            next if defined $a_objs{$_};
             $v[$m]->{_location} = 'dst_only';
             $v[$m]->{$id} = $_;
             $m++;
         }
-        my @common_keys = grep exists($b_objs{$_}), keys %a_objs;
+        my @common_keys = grep defined $b_objs{$_}, keys %a_objs;
         for (@common_keys) {
             my $comp = $s->compare_hash($a_objs{$_}, $b_objs{$_});
             $comp or next;
@@ -406,20 +414,45 @@ sub get_full_report {
     my $s = shift;
     my $uri = shift;
 
-    $s->get_report($uri);
-    $s->get_chapters;
-    $s->get_figures;
-    $s->get_images;
-    $s->get_tables;
-    $s->get_arrays;
-    $s->get_findings;
-    $s->get_references;
-    $s->get_publications;
-    $s->get_journals;
-    $s->get_parents($_) for @has_parents;
-    $s->get_relatives;
-    $s->get_parents('datasets');
-
+    for (qw(
+        report
+        chapters
+        figures
+        images
+        tables
+        findings
+        references
+        publications
+        journals
+        parents_1
+        relatives
+        parents_2
+        )) {
+        my ($type, $m) = split /_/;
+        my $sub = \&{"Exim::get_$type"};
+        if ($type eq 'report') {
+            $s->$sub($uri);
+            say " got report";
+        } elsif ($type eq 'parents') {
+            my @a = ($m == 1 ? @has_parents : 'datasets');
+            for (@a) {
+                $s->$sub($_);
+                say " got parents for $_";
+            }
+        } else {
+            $s->$sub;
+            my $t1;
+            if ($type eq 'journal') {
+                $t1 = scalar keys %{ $s->{publications} };
+            } elsif ($type eq 'relatives') {
+                $t1 = '';
+            } else { 
+                $t1 = scalar keys %{ $s->{$type} };
+            }
+            say " got $type : $t1";
+        }
+    }
+        
     for (qw(
         reports
         chapters
@@ -434,6 +467,7 @@ sub get_full_report {
         )) {
         $s->get_contributors($_);
         $s->get_files($_);
+        say " got contributors and files for $_";
     }
 
     $s->update_href($_, 'references') for qw(
@@ -457,6 +491,7 @@ sub get_full_report {
         organizations
         files
         );
+    say " updatted hrefs";
 
     return 0;
 }
@@ -635,8 +670,12 @@ sub get_references {
     my @objs = $s->get($obj_uri) or return 1;
     for (@objs) {
         my $uri = $_->{uri};
+        next if $s->{references}->{$uri};
+
         my $obj = $s->get($uri) or die "no reference : $uri";
-        delete $obj->{$_} for qw(chapter child_publication_id publication_id);
+        my $child_pub_uri = $obj->{child_publication};
+        delete $obj->{$_} for qw(chapter child_publication);
+        $obj->{child_publication_uri} = $child_pub_uri;
         $s->{references}->{$uri} = $obj;
     }
 
@@ -650,6 +689,7 @@ sub get_publications {
         my $ref = $s->{references}->{$_};
         if (my $uri = $ref->{child_publication_uri}) {
             next if $uri =~ m[^$s->{report_uri}];
+            next if $s->{publication}->{$uri};
 
             my $pub = $s->get($uri) or die "no publication : $uri";
             $s->{publications}->{$uri} = $pub;
@@ -687,10 +727,11 @@ sub get_journals {
     for (keys %{ $s->{publications} }) {
         my $pub = $s->{publications}->{$_};
         if (my $id = $pub->{journal_identifier}) {
-          my $uri = "/journal/$id";
-          my $jou = $s->get($uri) or die "no journal : $uri";
-          $jou->{articles} = [];
-          $s->{journals}->{$uri} = $jou;
+            my $uri = "/journal/$id";
+            next if $s->{journals}->{$uri};
+            my $jou = $s->get($uri) or die "no journal : $uri";
+            $jou->{articles} = [];
+            $s->{journals}->{$uri} = $jou;
         }
     }
 
@@ -760,7 +801,6 @@ sub get_relatives {
         for my $pub_map (@$pub_maps) {
             my $child_uri = $pub_map->{child_uri};
             $s->_check_relative($child_uri) or do {
-                $s->{all} ne "" or die "no child in list : $child_uri";
                 say "warning - no child in list : $child_uri"
             };
 
@@ -789,17 +829,23 @@ sub get_contributors {
         for my $con (@$contributors) {
             my $con_uri = $con->{uri};
 
-            my $org_uri = $con->{organization_uri};
-            my $org = $s->get($org_uri) or die "no organizaton : $org_uri";
-            delete $con->{organization};
-            delete $org->{id};
-            $s->{organizations}->{$org_uri} = $org;
+            if (my $org_uri = $con->{organization_uri}) {
+                if (!$s->{organizations}->{$org_uri}) {
+                    my $org = $s->get($org_uri) or 
+                        die "no organizaton : $org_uri";
+                    delete $con->{organization};
+                    delete $org->{id};
+                    $s->{organizations}->{$org_uri} = $org;
+                }
+            }
 
             if (my $per_uri = $con->{person_uri}) {
-                my $per = $s->get($per_uri) or die "no person : $per_uri";
-                delete $per->{contributors};
-                delete $per->{id};
-                $s->{people}->{$per_uri} = $per;
+                if (!$s->{people}->{$per_uri}) {
+                    my $per = $s->get($per_uri) or die "no person : $per_uri";
+                    delete $per->{contributors};
+                    delete $per->{id};
+                    $s->{people}->{$per_uri} = $per;
+                }
             }
             delete $con->{person};
             delete $con->{person_id};
@@ -967,9 +1013,10 @@ sub import_table {
     my $src = clone($src_orig);
     my $uri = $src->{uri};
 
-    my @ignore_src_items = (@common_ignore_src_items, qw(array_uris));
-    my @ignore_dst_items = (@common_ignore_dst_items, qw(arrays));
+    my @ignore_src_items = (@common_ignore_src_items, qw(arrays));
+    my @ignore_dst_items = (@common_ignore_dst_items, qw(arrays chapter));
 
+    my $same = 0;
     my $dst = $s->get($uri);
     if ($dst) {
         $s->_update_item_href($dst);
@@ -979,29 +1026,30 @@ sub import_table {
         say " comp :\n".Dumper($comp) if $comp;
         die "different item already in dst : $uri" if $comp;
         say " same item already in dst : $uri";
-        return 0;
+        $same = 1;
     }
 
-    if ($s->{access} ne 'update') {
-        say " would import item : $uri";
-        return 0;
+    if (!$same) {
+        if ($s->{access} ne 'update') {
+            say " would import item : $uri";
+            return 0;
+        }
+        say " importing item : $uri";
+        delete $src->{$_} for ('uri', @ignore_src_items);
+        my $report_uri = "/report/$src->{report_identifier}";
+        say " report_uri : $report_uri";
+        my $chapter_uri = $src->{chapter_identifier};
+        $chapter_uri = "/chapter/$chapter_uri" if $chapter_uri;
+        $s->post("$report_uri$chapter_uri/table", $src) or 
+            die "unable to import : $uri";
     }
-    say " importing item : $uri";
-    delete $src->{$_} for ('uri', @ignore_src_items);
-    my $report_uri = "/report/$src->{report_identifier}";
-    say " report_uri : $report_uri";
-    my $chapter_uri = $src->{chapter_identifier};
-    $chapter_uri = "/chapter/$chapter_uri" if $chapter_uri;
-    $s->post("$report_uri$chapter_uri/table", $src) or 
-        die "unable to import : $uri";
 
-    my $array_uris = $src_orig->{array_uris};
-    return 0 if !$array_uris;
-    for (@$array_uris) {
-        s/^\/array\///;
-        say " array : $_";
-        my $rel = ($uri =~ s/\/table\//\/table\/rel\//r);
-        $s->post($rel, {add_array_identifier => $_}) or
+    return 0 if !$src_orig->{arrays};
+    for (@{ $src_orig->{arrays} }) {
+        $s->import_array($_);
+        my $array_id =~ $_->{identifier};
+        my ($rel) = ($uri =~ s/\/table\//\/table\/rel\//r);
+        $s->post($rel, {add_array_identifier => $array_id}) or
             die "unable to add array to figure : $uri";
     }
     return 0;
@@ -1012,7 +1060,13 @@ sub import_array {
     my $src_orig = shift;
 
     my $src = clone($src_orig);
-    my $uri = $src->{uri};
+    my $uri;
+    if ($src->{uri}) {
+        $uri = $src->{uri};
+    } else {
+        $uri = "/array/$src->{identifier}";
+        $src->{uri} = $uri;
+    }
 
     my @ignore_src_items = (@common_ignore_src_items, qw(table_uris));
     my @ignore_dst_items = (@common_ignore_dst_items, qw(tables));
@@ -1039,7 +1093,7 @@ sub import_array {
     return 0;
 }
 
-sub import_findings {
+sub import_finding {
     my $s = shift;
     my $src_orig = shift;
 
@@ -1080,11 +1134,13 @@ sub import_reference {
     my $uri = $src->{uri};
 
     my $child_pub_uri = $src->{child_publication_uri};
+    $src->{child_publication} = $child_pub_uri;
     $s->_fix_uri(\$child_pub_uri);
-    my @ignore_src_items = qw(child_publication_uri);
-    my @ignore_dst_items = qw(child_publication_uri child_publication_id
-                              publication_id);
+    delete $src->{child_publication_uri};
+    my @ignore_src_items = qw(publications);
+    my @ignore_dst_items = qw(publications);
     my $dst = $s->get($uri);
+    my $same = 0;
     if ($dst) {
         $s->_update_item_href($dst);
         delete $src->{$_} for @ignore_src_items;
@@ -1093,25 +1149,40 @@ sub import_reference {
         say " comp :\n".Dumper($comp) if $comp;
         die "different item already in dst : $uri" if $comp;
         say " same item already in dst : $uri";
-        return 0;
+        $same = 1;
     }
 
     if ($s->{access} ne 'update') {
+        return 0 if $same;
         say " would import item : $uri";
         return 0;
     }
-    say " importing item : $uri";
-    delete $src->{$_} for ('uri', @ignore_src_items);
-    $s->post("/reference", $src) or
-        die "unable to import : $uri";
 
-    return 0 if !$child_pub_uri;
-    $s->post($uri, {
-        identifier => $src->{identifier},
-        attrs => $src->{attrs}, 
-        child_publication_uri => $child_pub_uri,
-        }) or 
-        die "unable to set child pub : $uri";
+    if (!$same) {
+        say " importing item : $uri";
+        delete $src->{$_} for ('uri', @ignore_src_items);
+        $s->post("/reference", $src) or
+            die "unable to import : $uri";
+    }
+
+    if ($child_pub_uri) {
+        $s->post($uri, {
+            identifier => $src->{identifier},
+            attrs => $src->{attrs}, 
+            child_publication_uri => $child_pub_uri,
+            }) or 
+            die "unable to set child pub : $uri";
+    }
+
+    return 0 unless $src_orig->{publications};
+    for (@{ $src_orig->{publications} }) {
+        $s->post($uri, {
+            identifier => $src->{identifier},
+            attrs => $src->{attrs},
+            publication => $_,
+            }) or
+            die "unable to set publication : $uri";
+    }
     
     return 0;
 }
@@ -1141,7 +1212,8 @@ sub import_publication {
                chapters report_figures report_findings report_tables));
        } elsif ($sub_type eq 'chapter') {
            @ignore_src_items = (@ignore_src_items, qw(
-               figure_uris finding_uris table_uris));
+               figure_uris finding_uris table_uris
+               figures findings tables));
            @ignore_dst_items = (@ignore_dst_items, qw(
                figures findings tables));
        } else {
@@ -1305,8 +1377,8 @@ sub import_person {
     my $dst = $s->get($uri);
     if ($dst) {
         $s->_update_item_href($dst);
-        delete $dst->{contributors};
-        delete $dst->{id};
+        delete $dst->{$_} for qw(id contributors aliases);
+        delete $src->{$_} for qw(contributors aliases);
         my $comp = $s->compare_hash($src, $dst);
         say " comp :\n".Dumper($comp) if $comp;
         die "different item already in dst : $uri" if ($comp);
@@ -1324,6 +1396,33 @@ sub import_person {
     delete $src->{uri};
     $s->post("/person", $src) or die "unable to import : $uri";
     return 0;
+}
+
+sub _contrib_uri {
+    my $a = shift;
+
+    my @us = split /\//, $a;
+    my $nv = @us;
+    my $loc = 2;
+    while (1) {
+        last unless $us[1] eq 'report';
+        last if $nv < 5;
+        my @f = qw(array figure finding image table);
+        if (grep $us[3] eq $_, @f) {
+            $loc = 4;
+            last;
+        }
+        last if $us[3] ne 'chapter';
+        $loc = 4;
+        last if $nv < 7;
+        last unless grep $us[5] eq $_, @f;
+        $loc  = 6;
+        last;
+    }
+    splice @us, $loc, 0, 'contributors';
+    my $u = join '/', @us;
+
+    return $u;
 }
 
 sub link_contributors {
@@ -1345,8 +1444,10 @@ sub link_contributors {
         my $con_uri = $c->{uri};
 
         my $org_uri = $c->{organization_uri};
-        my $dst_org = $s->get($org_uri) or 
-            die "organization does not already exist : $org_uri";
+        if ($org_uri) {
+            my $dst_org = $s->get($org_uri) or 
+                die "organization does not already exist : $org_uri";
+        }
         my $per_uri = $c->{person_uri};
         if ($per_uri) {
             my $dst_per = $s->get($per_uri) or 
@@ -1363,10 +1464,9 @@ sub link_contributors {
             role => $c->{role_type_identifier},
             organization_identifier => $c->{organization_uri},
             person_id => ($c->{person_uri} =~ s[^/.*/][]r),
-            };
-        my $src_id = ($src->{uri} =~ s[^/.*/][]r);
-        my ($pub_type) = ($src->{uri} =~ m[^/(.*)/]);
-        $s->post("/$pub_type/contributors/$src_id", $new_con) 
+        };
+        my $u1 = _contrib_uri($src->{uri});
+        $s->post($u1, $new_con) 
             or die "unable to link : $src->{uri}";
     }
 
@@ -1396,9 +1496,13 @@ sub link_parents {
             next;
         }
         say " adding link to parent for : $uri";
-        my $rep = $report_uri if 
-            grep $type eq $_, qw(figure table finding);
-        $s->post("$rep/$type/prov/$id", $p) or
+        my $pre;
+        if (grep $type eq $_, qw(figure table finding)) {
+            $pre = "$report_uri/$type";
+        } else {
+            ($pre) = ($uri =~ /^(\/.*?)\//);
+        }
+        $s->post("$pre/prov/$id", $p) or
             die "unable to link parents : $uri";
     }
 
@@ -1499,13 +1603,14 @@ sub import_files {
 }
 
 sub import_organization {
+
     my $s = shift;
     my $src_orig = shift;
 
     my $src = clone($src_orig);
     my $uri = $src->{uri};
 
-    my @ignore_items = qw(id aliases);
+    my @ignore_items = qw(id aliases parents children);
     my $dst = $s->get($uri);
     if ($dst) {
         $s->_update_item_href($dst);
@@ -1540,6 +1645,7 @@ sub get_files {
         $obj->{file_uris} = [];
         for my $f (@$files) {
             my $f_uri = $f->{uri};
+            $f_uri or die " no file uri for $obj->{uri}";
             $obj->{file_uris}[$n++] = $f_uri;
             my $file = $s->get($f_uri) or die "no file";
             delete $file->{$_} for qw(thumbnail thumbnail_href);
@@ -1601,13 +1707,19 @@ sub load {
     my $e;
     if (!$file) {
        my $yml = do { local $/; <> };
+       utf8::encode($yml);
        $e = Load($yml);
     } else {
        open my $f, '<:encoding(UTF-8)', $file or die "can't open file";
        my $yml = do { local $/; <$f> };
+       utf8::encode($yml);
        $e = Load($yml);
     }
 
+    for my $k (keys %{ $e }) {
+        grep $k eq $_, (@item_list, 'report', 'items', 'base')
+            or die "invalid item in input file : $k";
+    }
     ref $e->{base} ne 'ARRAY' or die "only one base allowed";
     $s->{base} = $e->{base};
 
@@ -1622,7 +1734,10 @@ sub load {
         $e->{$items} or next;
         next if $items eq 'reports';
 	ref($e->{$items}) eq 'ARRAY' or die "must be an array : $items";
-        $s->{$items}->{$_->{uri}} = $_ for @{ $e->{$items} };
+        for (@{ $e->{$items} }) {
+            $_->{uri} or die "items must have a uri : $items";
+            $s->{$items}->{$_->{uri}} = $_;
+        }
     }
 
     return;   
