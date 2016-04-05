@@ -1,0 +1,136 @@
+
+Export/import scripts
+
+GCIS Report Export/import Example
+
+
+This is an example of using scripts from gcis-scripts to export and import a report from GCIS.  It exports a report from an instance of GCIS and imports it into another instance of GCIS.
+
+Note, after discussions with Brian, the approach for using the map file for people (below) will likely be changed to a different appraoch.  Is this alternate appraoch for a person who exists in both the export (src) and import (dst) instance of gcis, the person id is changed in the src instance to match the same person in the dst intance.
+
+Setup:
+
+1. Get the latest version of gcis-scripts from Github USGCRP/gcis-scripts.
+
+2. Add the library Exim.pm location to the perl library enviornment.  
+   For instance:
+
+   export PERL5LIB=$PERL5LIB:/home/<your_directory>/gcis-scripts/lib
+
+Export/import Example:
+
+1. Export the report
+
+   $ export-report.pl --log_file=export-log.txt 
+                      --url=http://data.src.gcis.gov 
+                      --report=indicator-terrestrial-carbon-storage 
+                      > report.txt
+
+2. Get report files in temporary directory
+
+   $ mkdir tmp
+
+   $ get-files.pl --log_file=get-files-log.txt 
+                  --input=report.txt 
+                  --local=./tmp
+                  > report_files.txt
+
+3. Generate an mimimal mapping file (yaml).  The file report_map.txt will 
+   have the following text:
+
+   ---
+   base:
+     dst: http://data.dst.gcis.gov
+     src: http://data.src.gcis.gov
+   items: 
+     base: 1
+
+4. Import the report -- this will take a number of iterations depending on 
+   the number of people conflicts found.  (In this example, only one 
+   iteration is needed).
+
+   $ import-report.pl --log_file=import-log.txt 
+                      --url=http://data.dst.gcis.gov 
+                      --input=report.txt 
+                      --map=report_map.txt 
+                      --local=./tmp
+
+5. The script will find the same person with a different id in the src and 
+   dst directories.  Add a mapping to the map file and update the items list. 
+   The updated map file will now look like this:
+
+   ---
+   base:
+     dst: http://data.dst.gcis.gov
+     src: http://data.src.gcis.gov
+   items: 
+     base: 1
+     people: 1
+   people: 
+   - uri: /person/1976
+     dst: /person/2291
+
+6. Rerun step 4 and the script should finish with no more errors.
+
+7. Compare the output -- the first time there will be differences because 
+   the file and contributor ids are different.
+
+   $ compare-report.pl --log_file=compare-log.txt 
+                       --url=http://data.dst.gcis.gov 
+                       --input=report.txt 
+                       --map=report_map.txt
+
+8. Update the map file to include the contributor ids and new file id.  The 
+   updated map file will look something like this (the dst ids will likely 
+   be different):
+
+   ---
+   base:
+     dst: http://data.dst.gcis.gov
+     src: http://data.src.gcis.gov
+   contributors:
+   - uri: /contributor/3362
+     dst: /contributor/4230
+   - uri: /contributor/3439
+     dst: /contributor/4232
+   - uri: /contributor/3378
+     dst: /contributor/4231
+   - uri: /contributor/3372
+     dst: /contributor/4233
+   files:
+   - uri: /file/d5b5cb81-40e6-4ccc-915b-9245c3a688a8
+     dst: /file/85018a55-1cf4-487e-816a-1851b9e615e7
+   items:
+     base: 1
+     contributors: 4
+     people: 1
+     files: 1
+   people:
+   - uri: /person/1976
+     dst: /person/2291
+
+9. Rerun the comparison and everything should be the same.
+
+10. Delete temporary files:
+
+    rm ./tmp/*
+
+Optional - cleanup after running a test import
+
+   *** Only for test purposes -- no need to do this for the actual import ***
+
+1. Create new cleanup file with specific items to be removed.  No need to 
+   include report associated items (figures, etc.), just the main report.  
+   The contents of the cleanup file (cleanup.txt) for the above: 
+
+   /dataset/indicator-terrestrial-carbon-storage-epainventory-r1
+   /image/7e2eaa2c-aa29-444d-864e-522849748197
+   /report/indicator-terrestrial-carbon-storage
+   /activity/7e2eaa2c-terrestrial-carbon-storage-epainventory-r1-process
+   /file/85018a55-1cf4-487e-816a-1851b9e615e7
+
+   Note: The file id will be different.
+
+2. Run the cleanup
+
+   cleanup-report.pl < cleanup.txt
