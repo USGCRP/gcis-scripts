@@ -705,24 +705,27 @@ sub import_article {
     my $check_external = 0;
     if ($a->{doi}) {
         my $cr = CrossRef->new;
-        $c = $cr->get($a->{doi}) or do {
+        $c = $cr->get($a->{doi});
+        if (!$c) {
             say " doi not in crossref : $a->{doi}";
             $stats{doi_not_in_crossref}++;
-            return 0;
-       };
-       $check_external = 1;
-       $a->{identifier} = $a->{doi};
+       } else {
+            $check_external = 1;
+            $a->{identifier} = $a->{doi};
+       }
     } elsif ($a->{pmid}) {
        my $pm = PubMed->new;
-       $c = $pm->get($a->{pmid}) or do {
-            say " id not in pubmed : $a->{pmid}\n   for : $a->{title}";
-            $stats{id_not_in_pubmed}++;
-            return 0;
-       };
-       $check_external = 1;
-       $a->{identifier} = 'pmid-'.$c->{pmid};
-       $a->{pmid} = $c->{pmid};
-    } else {
+       $c = $pm->get($a->{pmid}); 
+       if (!$c) {
+           say " id not in pubmed : $a->{pmid}\n   for : $a->{title}";
+           $stats{id_not_in_pubmed}++;
+       } else {
+           $check_external = 1;
+           $a->{identifier} = 'pmid-'.$c->{pmid};
+           $a->{pmid} = $c->{pmid};
+       }
+    }
+    if (!$c) {
        $c = get_item($g, 'article', $a);
     }
     $a->{uri} = "/article/$a->{identifier}";
@@ -1122,7 +1125,7 @@ sub import_bib_only {
             'Date Published' => 'Date',
             'Publisher' => '.publisher',
             'Publication Title' => undef,
-            'Secondary Title' => undef, 
+            'Secondary Title' => 'Journal', 
             'ISBN' => undef, 
         },
         book => {
@@ -1306,8 +1309,8 @@ sub main {
        'Web Page' => 'webpage',
     );
     my @which = qw(article report webpage);
-    my $bib_only = 0;
-    my $do_all = 0;
+    my $bib_only = 1;
+    my $do_all = 1;
     for (@{ $r->{records} }) {
         $p{ref} = $_;
         $p{type} = $map{$_->{reftype}[0]} or 
