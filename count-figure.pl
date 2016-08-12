@@ -64,8 +64,6 @@ sub main {
         $total_figures += $num_figures;
         $num_figures++;
     }
-    # WTF is nc? TODO with Amrutha
-    my $nc = 0;
     my $num_images = 0;
     my $num_parents = 0;
     my $num_activities = 0;
@@ -78,10 +76,6 @@ sub main {
         $num_parents += $c->{num_parents};
         $num_activities += $c->{num_activities};
         $num_datasets += $c->{num_datasets};
-        $nc++;
-
-
-        last if $nc >=20 ;
     }
     my $unique_figures = keys %figs;
     say "";
