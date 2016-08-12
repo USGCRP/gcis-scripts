@@ -20,7 +20,6 @@ GetOptions(
   'help|?'      => sub { pod2usage(verbose => 2) },
 ) or die pod2usage(verbose => 1);
 
-my $n = 0;
 &main;
 
 sub main {
@@ -33,104 +32,109 @@ sub main {
 
     my $do_all = $all ? "?all=1" : undef;
 
-    my $g = Gcis::Client->new(url => $url);
+    my $gcis_client = Gcis::Client->new(url => $url);
 
-    my $r = $g->get("$res$do_all") or die " no resource";
+    say "Running Query :  $url$res$do_all\n";
+    my $r = $gcis_client->get("$res$do_all") or die " no resource";
+    #say Dumper $r;
     if (ref $r ne 'ARRAY') {
        $r = [$r];
     }
 
-    my $n = 0;
-    my $nfig = 0;
-    my $m = 0;
+    my $num_resources = 0;
+    my $num_figures = 0; # per resource
+    my $total_figures = 0;
     my %figs;
+
+    say " ID : Number of Figures";
     for (@{ $r }) {
         my $u = $_->{uri};
-        $n++;
+        $num_resources++;
         my $id = $_->{identifier};
 
-        my $fig = $g->get("$u/figure$do_all") or do {
+        my $fig = $gcis_client->get("$u/figure$do_all") or do {
           say " $id : error";
 
           next;
         };
-        my $nfig = scalar @{ $fig };
-        next if $nfig == 0;
+        my $num_figures = scalar @{ $fig };
+        next if $num_figures == 0;
         map {$figs{$_->{uri}}++} @{ $fig };
-        say " $id : $nfig";
-        $m += $nfig;
-        $nfig++;
+        say " $id : $num_figures";
+        $total_figures += $num_figures;
+        $num_figures++;
     }
+    # WTF is nc? TODO with Amrutha
     my $nc = 0;
-    my $nimg = 0;
-    my $npar = 0;
-    my $nact = 0;
-    my $ndat = 0;
+    my $num_images = 0;
+    my $num_parents = 0;
+    my $num_activities = 0;
+    my $num_datasets = 0;
     for (keys %figs) {
-        my $c = count_img($g, $_);
+        my $c = count_img($gcis_client, $_);
         next unless $c;
-        #say "   nimg : $c->{nimg} ";
-        $nimg += $c->{nimg};
-        $npar += $c->{npar};
-        $nact += $c->{nact};
-        $ndat += $c->{ndat};
+        #say "   num_images : $c->{num_images} ";
+        $num_images += $c->{num_images};
+        $num_parents += $c->{num_parents};
+        $num_activities += $c->{num_activities};
+        $num_datasets += $c->{num_datasets};
         $nc++;
 
 
         last if $nc >=20 ;
     }
-    my $mu = keys %figs;
+    my $unique_figures = keys %figs;
     say "";
-    say " $res : $n";
-    say " total : $m";
-    say " unique : $mu";
-    say " have fig : $nfig";
-    say " total img : $nimg";
-    say " total par : $npar";
-    say " total act : $nact";
-    say " total dat : $ndat";
+    say " $res    : $num_resources";
+    say " total          : $total_figures";
+    say " unique         : $unique_figures";
+    say " have figure    : $num_figures";
+    say " total image    : $num_images";
+    say " total parents  : $num_parents";
+    say " total activity : $num_activities";
+    say " total dataset  : $num_datasets";
 
     say " done";
     return;
 }
 
 sub count_img { 
-    my $g = shift;
+    my $gcis_client = shift;
     my $f = shift;
     #say " f : $f"; 
     my $c;  
-    my $fig = $g->get($f) or do {
+    my $fig = $gcis_client->get($f) or do {
         say " $f : error";
         return undef;
     };
     #say " fig : \n".Dumper($fig); 
     for (@{ $fig->{images} }) {
-        my $a = count_act($g, "/image/$_->{identifier}");
+        my $a = count_act($gcis_client, "/image/$_->{identifier}");
         next unless $a;
-        $c->{nimg}++;
-        $c->{npar} += $a->{npar};
-        $c->{nact} += $a->{nact};
-        $c->{ndat} += $a->{ndat};
+        $c->{num_images}++;
+        $c->{num_parents} += $a->{num_parents};
+        $c->{num_activities} += $a->{num_activities};
+        $c->{num_datasets} += $a->{num_datasets};
       
     }
     return $c;
 }
 
 sub count_act {
-    my $g = shift;
+    my $gcis_client = shift;
     my $r = shift;
     #say " r : $r"; 
     my $c;
-    my $res = $g->get($r) or do {
+    my $res = $gcis_client->get($r) or do {
         say " $r : error";
         return undef;
     };
     #say " res : \n".Dumper($res);
     
     for (@{ $res->{parents} }) {
-        $c->{npar}++;
-        $c->{nact}++ if $_->{activity_uri};
-        $c->{ndat}++ if $_->{url} =~ /^\/dataset\//;
+        $c->{num_parents}++;
+        $c->{num_activities}++ if $_->{activity_uri};
+        $c->{num_datasets}++ if $_->{url} =~ /^\/dataset\//;
     }    
     
     return $c;
@@ -140,16 +144,16 @@ sub count_act {
 
 =head1 NAME
 
-cnt-ref.pl -- count references for a resource
+count-figure.pl -- count figures for a resource
 
 =head1 DESCRIPTION
 
-cnt-ref -- Counts the references for a resource such as chapters in a 
+count-figure -- Counts the figures for a resource such as chapters in a 
 report.
 
 =head1 SYNOPSIS
 
-./cnt-ref.pl [OPTIONS]
+./count-figure.pl [OPTIONS]
 
 =head1 OPTIONS
 
@@ -157,11 +161,11 @@ report.
 
 =item B<--url>
 
-GCIS url, e.g. http://data.globalchange.gov
+Required, GCIS url, e.g. http://data.globalchange.gov
 
 =item B<--resource>
 
-GCIS resource, e.g. /report/nca3/chapter
+Required, GCIS resource, e.g. /report/nca3/chapter. Empty string is acceptable.
 
 =item B<stdout>
 
@@ -171,17 +175,13 @@ Count of references for the resource
 
 Set to indicate all resources are to counted.
 
-=item B<--local>
-
-Directory to store file (defaults to ".")
-
 =back
 
 =head1 EXAMPLES
 
-Count the number of references for the chapters in the nca3 report
+Count the number of figures for the chapters in the nca3 report
 
-./cnt-res.pl --url http://data.globalchange.gov
+./count-figure.pl --url http://data.globalchange.gov
              --resouce /report/nca3/chapter  --all
 
 =cut
