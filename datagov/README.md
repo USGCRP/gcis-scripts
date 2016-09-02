@@ -53,7 +53,7 @@ Steps
   ./get-tags.pl
 
   Notes
-  a. No current script to add tags to gcis.
+  - No current script to add tags to gcis.
 
 Other scripts
 
