@@ -41,81 +41,104 @@ sub get_group {
         my $r = $t->{result}->{results};
         scalar @{ $r } or last;
         for (@$r) {
-            my $v = \%{ $d[$n] };
-            # say " r :\n".Dumper($_);
-            # say " id : $_->{id}";
+            my $v = _extract($_) or next;
+            push @d, $v;
             $n++;
-            $v->{idDataGov} = $_->{id};
-            $v->{idAgency} = _get_id_agency($_);
-            # say " r :\n".Dumper($_) if $v->{idAgency} eq $ex;
-            for my $i (qw(title name notes)) {
-                next unless $_->{$i};
-                $v->{$i} = $_->{$i};
-            }
-            if ($_->{organization}->{title}) {
-                $v->{organization} = $_->{organization}->{title};
-            }
-            my $e = $_->{extras};
-            for (@$e) {
-                my $k = $_->{key};
-                if (grep $k eq $_, qw(programCode bureauCode)) {
-                    $v->{$k} = $_->{value}[0];
-                    next;
-                }
-                if (grep $k eq $_, qw(describedBy landingPage)) {
-                    $v->{$k} = $_->{value};
-                    next;
-                }
-                if ($k eq 'spatial') {
-                    my $s = _get_spatial($_->{value}) or next;
-                    $v->{$k} = $s;
-                    next;
-                }
-                if ($k eq 'temporal') {
-                    my $t = _get_temporal($_->{value}) or next;
-                    $v->{$k} = $t;
-                    next;
-                }
-                if ($k eq 'responsible-party') {
-                    my $p = _get_resp($_->{value}) or next;
-                    $v->{$k} = $p;
-                    next;
-                }
-                if ($k eq 'publisher') {
-                    $v->{$k} = $_->{value};
-                    next;
-                }
-                if ($k eq 'publisher_hierarchy') {
-                    $v->{$k} = $_->{value};
-                    $v->{$k} =~ s/ *> */, /g;
-                    next;
-                }
-                if ($k eq '__category_tag_aa0c01c9-d292-4dc1-8fec-b10c1bb629a9') {
-                    my $p = _get_tags($_->{value}) or next;
-                    $v->{tags} = $p;
-                    next;
-                }
-            }
-            if (!$v->{spatial}) {
-                my $bb = 0;
-                for (@$e) {
-                    next unless $_->{key} =~ /^bbox/;
-                    $bb = 1;
-                    last;
-                }
-                say " error - bounding box without spatial" if $bb;
-            }
-            for (@{ $_->{resources} }) {
-                next unless $_->{resource_locator_function} = 'download';
-                $v->{downloadURL} = $_->{url};
-                last;
-            }
             last if $s->{n_max} > 0  &&  $n >= $s->{n_max};
         }
         last if $s->{n_max} > 0  &&  $n >= $s->{n_max};
     }
-
     return \@d;
+}
+
+sub get_id {
+    my $s = shift;
+    my $id = shift;
+
+    my $u = $s->{url}.'package_show?id='.$id;
+
+    my $c = $s->{ua}->get($u)->res or die 'ckan get failed';
+    my $t = $c->json or die 'no json';
+    my $r = $t->{result};
+
+    my $v = _extract($r) or return undef;
+
+    return $v;
+}
+
+sub _extract {
+    my $r = shift;
+    my $v;
+    
+    $v->{idDataGov} = $r->{id} or return undef;
+    $v->{idAgency} = _get_id_agency($r);
+    for my $i (qw(title name notes)) {
+        next unless $r->{$i};
+        $v->{$i} = $r->{$i};
+    }
+    if ($r->{organization}->{title}) {
+        $v->{organization} = $r->{organization}->{title};
+    }
+
+    my $e = $r->{extras};
+    for (@$e) {
+        my $k = $_->{key};
+        if (grep $k eq $_, qw(programCode bureauCode)) {
+            $v->{$k} = $_->{value}[0];
+            next;
+        }
+        if (grep $k eq $_, qw(describedBy landingPage)) {
+            $v->{$k} = $_->{value};
+            next;
+        }
+        if ($k eq 'spatial') {
+            my $s = _get_spatial($_->{value}) or next;
+            $v->{$k} = $s;
+            next;
+        }
+        if ($k eq 'temporal') {
+            my $t = _get_temporal($_->{value}) or next;
+            $v->{$k} = $t;
+            next;
+        }
+        if ($k eq 'responsible-party') {
+            my $p = _get_resp($_->{value}) or next;
+            $v->{$k} = $p;
+            next;
+        }
+        if ($k eq 'publisher') {
+            $v->{$k} = $_->{value};
+            next;
+        }
+        if ($k eq 'publisher_hierarchy') {
+            $v->{$k} = $_->{value};
+            $v->{$k} =~ s/ *> */, /g;
+            next;
+        }
+        if ($k eq '__category_tag_aa0c01c9-d292-4dc1-8fec-b10c1bb629a9') {
+            my $p = _get_tags($_->{value}) or next;
+            $v->{tags} = $p;
+            next;
+        }
+    }
+
+    if (!$v->{spatial}) {
+        my $bb = 0;
+        for (@$e) {
+            next unless $_->{key} =~ /^bbox/;
+            $bb = 1;
+            last;
+        }
+        say " error - bounding box without spatial" if $bb;
+    }
+
+    for (@{ $r->{resources} }) {
+         next unless $_->{resource_locator_function} = 'download';
+         $v->{downloadURL} = $_->{url};
+         last;
+    }
+
+    return $v;
 }
 
 sub _get_id_agency {
