@@ -32,22 +32,22 @@ Steps
    ./org-alias.pl < org_alias.yaml
    
    Notes
-   a. The input (org_alias.yaml) contains manually entered mappings between data.gov organizations (term) and gcids (gcid).
-   b. Use step 2 to get the organizations that need to be mapped and then repeat this step until all organizations are mapped.
+   - The input (org_alias.yaml) contains manually entered mappings between data.gov organizations (term) and gcids (gcid).
+   - Use step 2 to get the organizations that need to be mapped and then repeat this step until all organizations are mapped.
 
 4. Generate gcids for data.gov datasets and write them in yaml format to stdout (e.g. connect_ids.yaml).
 
    ./connect-ids < get_ckan.yaml
 
    Notes
-    a. Also reads other_ids.yaml which contains manually entered mappings between data.gov ids (term) and gcids (gcid).
+   - Also reads other_ids.yaml which contains manually entered mappings between data.gov ids (term) and gcids (gcid).
 
 5. Copy metadata from ckan yaml file and put (update) metadata in GCIS
 
   ./add-ckan.pl < get_ckan.yaml
 
   Notes 
-    a. Also reads connect_ids.yaml
+  - Also reads connect_ids.yaml
 
 6. Get cdi tages for datasets form data.gov, produces yaml formatted output with tags on stdout (e.g. get_tags.yaml).
   ./get-tags.pl
