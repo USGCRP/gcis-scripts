@@ -20,8 +20,11 @@ sub main {
     my $g = Gcis::Client->new(url => $url);
     my @d;
     my $e = load_list();
+    my $t = load_list('tags.yaml');
     my $n = 0;
-    my %c;
+    my $n = 0;
+    my %c1;
+    my %c2;
     for my $x (@$e) {
         $n++; 
         last if $n_max > 0  &&  $n > $n_max;
@@ -32,7 +35,9 @@ sub main {
         }
         if ($v->{tags}) {
             $v->{tags} = uniq($v->{tags});
-            $c{$_}++ for @{ $v->{tags} };
+            $c1{$_}++ for @{ $v->{tags} };
+            $v->{tags} = reduce($t, $v->{tags});
+            $c2{$_}++ for @{ $v->{tags} };
         }
         $a = $g->get("/lexicon/datagov/identifier/$v->{idDataGov}") or do {
             say " error - not in gcis : $v->{idDataGov}";
@@ -42,8 +47,10 @@ sub main {
         push @d, $v;
     }
     $n--;
-    say " count (of $n)";
-    say "   $_ : $c{$_}" for keys %c;
+    say " full count (of $n)";
+    say "   $_ : $c1{$_}" for sort keys %c1;
+    say " reduced count (of $n)";
+    say "   $_ : $c2{$_}" for sort keys %c2;
     say Dump(\@d);
     exit;
 }
@@ -68,5 +75,46 @@ sub uniq {
     my $l = shift;
     my %c;
     my @u = grep { not $c{$_}++ } @$l;
+    return \@u;
+}
+
+sub reduce {
+    my $t = shift;
+    my $v = shift;
+
+    my %h;
+    my %s;
+    my @u;
+    my @e;
+
+    for (@$v) {
+        if (exists $t->{$_}) {
+            $h{$_}++;
+            next;
+        }
+        my $is_subtheme = 0;
+        for my $c (keys %$t) {
+            next unless exists $t->{$c}->{$_};
+            $s{$_} = $c;
+            $is_subtheme = 1;
+            last;
+        }
+        if (!$is_subtheme) {
+            say " error - not in theme or sub-theme list : $_";
+            push @e, "_error_not_found : $_";
+            $s{$_} = undef;
+        } 
+    }
+    for (keys %s) {
+        next if exists $h{$s{$_}};
+        say " error - no theme ($s{$_}) for sub-theme : $_";
+        push @e, "_error_no_theme : $_";
+    }
+    delete $h{$s{$_}} for keys %s;
+    # say " theme : $_" for keys %h;
+    # say " sub-theme : $_ -> $s{$_}" for keys %s;
+    push @u, $_ for (keys %h, keys %s);
+    push @u, $_ for @e;
+
     return \@u;
 }

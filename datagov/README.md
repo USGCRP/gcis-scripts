@@ -59,10 +59,20 @@ Steps
   - Also reads connect_ids.yaml
 
 6. Get cdi tages for datasets form data.gov, produces yaml formatted output with tags on stdout (e.g. get_tags.yaml).
+
   ./get-tags.pl
 
   Notes
-  - No current script to add tags to gcis.
+  - Also reads tags.yaml which contains a heirarchy of tags.
+
+tags.pl example:
+
+---
+Arctic:
+  Arctic Ocean, Sea Ice and Coasts:
+  Melting Glaciers, Snow and Ice:
+
+  - There is no current script to add tags to gcis.
 
 Other scripts
 
