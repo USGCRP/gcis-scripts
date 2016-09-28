@@ -65,12 +65,12 @@ Steps
   Notes
   - Also reads tags.yaml which contains a heirarchy of tags.
 
-tags.pl example:
+    tags.pl example:
 
----
-Arctic:
-  Arctic Ocean, Sea Ice and Coasts:
-  Melting Glaciers, Snow and Ice:
+> ---
+> Arctic:
+>   Arctic Ocean, Sea Ice and Coasts:
+>   Melting Glaciers, Snow and Ice:
 
   - There is no current script to add tags to gcis.
 
