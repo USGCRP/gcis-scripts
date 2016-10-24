@@ -1,5 +1,65 @@
 #!/usr/bin/env perl
 
+=head1 NAME
+
+to-generic - creates child pubs of class "generic" for non-standard reference types, associates them with reference
+
+=head1 SYNOPSIS
+
+togeneric [options]
+
+  Options:
+    -type refers to the type of reference to be updated.
+    -url refers to the URL of the GCIS instance.
+    -max_update is the maximum number of entries to update. 
+    -dry_run is a flag that indicates a dry run.
+    -help provides a brief help message.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-type>
+
+the type of reference to be updated (default is cproc)
+
+the allowed values are:
+
+    marticle : Magazine Article
+    narticle : Newspaper Article
+    earticle : Electronic Article
+    cpaper   : Conference Paper
+    cproc    : Conference Proceedings
+    thesis   : Thesis
+    film     : Film or Broadcast
+
+=item B<-url>
+
+the URL of the GCIS instance (default is the dev instance)
+
+=item B<-max_update>
+
+the maximum number of entries to update (default is 1 entry)
+
+=item B<-dry_run>
+
+a flag that indicates a dry run (default is to update the instance)
+
+=item B<-help>
+
+prints a help message and exits
+
+=back
+
+=head1 DESCRIPTION
+
+B<togeneric.pl> creates child publications of class 'generic' for reference types of
+nonstandard reference type classes.  The child pubs are subsequently associcated with these
+references.  The program is designed to allow users to select how many new child pubs to
+create, and displays the title and UUID pertaining to each new child pub entry generated.
+
+=cut
+
 # This creates a generic publication for the references having reftypes which do not exist in our data model.
 # The generic publication is subequently associated with the reference.
 
@@ -168,62 +228,3 @@ say "done";
 
 __END__
 
-=head1 NAME
-
-to-generic - creates child pubs of class "generic" for non-standard reference types, associates them with reference
-
-=head1 SYNOPSIS
-
-togeneric [options]
-
-  Options:
-    -type refers to the type of reference to be updated.
-    -url refers to the URL of the GCIS instance.
-    -max_update is the maximum number of entries to update. 
-    -dry_run is a flag that indicates a dry run.
-    -help provides a brief help message.
-
-=head1 OPTIONS
-
-=over 8
-
-=item B<-type>
-
-the type of reference to be updated (default is cproc)
-
-the allowed values are:
-
-    marticle : Magazine Article
-    narticle : Newspaper Article
-    earticle : Electronic Article
-    cpaper   : Conference Paper
-    cproc    : Conference Proceedings
-    thesis   : Thesis
-    film     : Film or Broadcast
-
-=item B<-url>
-
-the URL of the GCIS instance (default is the dev instance)
-
-=item B<-max_update>
-
-the maximum number of entries to update (default is 1 entry)
-
-=item B<-dry_run>
-
-a flag that indicates a dry run (default is to update the instance)
-
-=item B<-help>
-
-prints a help message and exits
-
-=back
-
-=head1 DESCRIPTION
-
-B<togeneric.pl> creates child publications of class 'generic' for reference types of
-nonstandard reference type classes.  The child pubs are subsequently associcated with these
-references.  The program is designed to allow users to select how many new child pubs to
-create, and displays the title and UUID pertaining to each new child pub entry generated.
-
-=cut

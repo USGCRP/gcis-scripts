@@ -1,6 +1,5 @@
 #!/usr/bin/env perl
 
-
 =head1 NAME
 
 check-dois.pl -- Check to see if dois exist in GCIS.

@@ -1,5 +1,75 @@
 #!/usr/bin/env perl
 
+=head1 NAME
+
+import-report.pl -- import report from source to destination
+
+=head1 DESCRIPTION
+
+import-report.pl imports an entire report with all of the dependent 
+information.  The report source is a yaml file (see export-report.pl).
+The destination is a gcis instance.
+
+If a mapping file is provided, the import is done after the mapping 
+from source to destination is done.
+
+Any new files associated with the report must already be downloaded 
+in a local directory.
+
+=head1 SYNOPSIS
+
+./import-report.pl [OPTIONS]
+
+=head1 OPTIONS
+
+=over
+
+=item B<--url>
+
+GCIS url, e.g. http://data-stage.globalchange.gov
+
+=item B<--log_file>
+
+Log file (/tmp/gcis-import.log)
+
+=item B<--log_level>
+
+Log level (see Mojo::Log)
+
+=item B<--input>
+
+Input (source) report (yaml file, defaults to STDIN)
+
+=item B<--map_File>
+
+Input mapping file (yaml file, defaults to NULL)
+
+=item B<--max_import>
+
+Maximum number of items to import (defaults to 100)
+
+=item B<--local>
+
+Directory where the report files are located (defaults to ".", see get-files.pl)
+
+=item B<--not_all>
+
+Set to only export first set of items (opposite of "?all=1")
+
+=item B<--dry_run or --n>
+
+Set to perform dry run (no update)
+
+=back
+
+=head1 EXAMPLES
+
+    # import a report
+    ./import-report.pl --url=http://datas-dev-front.joss.ucar.edu
+                       --input=report.yaml
+
+=cut
+
 use Getopt::Long qw/GetOptions/;
 use Pod::Usage qw/pod2usage/;
 
@@ -183,72 +253,3 @@ sub link_resource {
 
 1;
 
-=head1 NAME
-
-import-report.pl -- import report from source to destination
-
-=head1 DESCRIPTION
-
-import-report.pl imports an entire report with all of the dependent 
-information.  The report source is a yaml file (see export-report.pl).
-The destination is a gcis instance.
-
-If a mapping file is provided, the import is done after the mapping 
-from source to destination is done.
-
-Any new files associated with the report must already be downloaded 
-in a local directory.
-
-=head1 SYNOPSIS
-
-./import-report.pl [OPTIONS]
-
-=head1 OPTIONS
-
-=over
-
-=item B<--url>
-
-GCIS url, e.g. http://data-stage.globalchange.gov
-
-=item B<--log_file>
-
-Log file (/tmp/gcis-import.log)
-
-=item B<--log_level>
-
-Log level (see Mojo::Log)
-
-=item B<--input>
-
-Input (source) report (yaml file, defaults to STDIN)
-
-=item B<--map_File>
-
-Input mapping file (yaml file, defaults to NULL)
-
-=item B<--max_import>
-
-Maximum number of items to import (defaults to 100)
-
-=item B<--local>
-
-Directory where the report files are located (defaults to ".", see get-files.pl)
-
-=item B<--not_all>
-
-Set to only export first set of items (opposite of "?all=1")
-
-=item B<--dry_run or --n>
-
-Set to perform dry run (no update)
-
-=back
-
-=head1 EXAMPLES
-
-    # import a report
-    ./import-report.pl --url=http://datas-dev-front.joss.ucar.edu
-                       --input=report.yaml
-
-=cut

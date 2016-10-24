@@ -1,5 +1,51 @@
 #!/usr/bin/env perl
 
+=head1 NAME
+
+redirect_to_external_files.pl - redo the location of assets
+
+=head1 DESCRIPTION
+
+redirect_to_external_files - given a report, a location, and a new name
+scheme, update the file paths for that report's assets.
+
+=head1 SYNOPSIS
+
+./redirect_to_external_files.pl --report="report-identifier" --location="shared-base-url" [OPTIONS]
+
+=head1 OPTIONS
+
+=over
+
+=item B<--client>
+
+The GCIS instance you would like to interact with (e.g. https://data-stage.globalchange.gov)
+
+=item B<--location>
+
+The base URL for the new location of the assets. WIll end up in the 'location' field
+for the report's files.
+
+=item B<--report>
+
+The report identifier whos assets are being modified
+
+=item B<--dry-run>
+
+Don't actually make the DB changes, but report out what they would be.
+
+=back
+
+=head1 EXAMPLES
+
+Make all of the 2016 Health Assessment assets point to the S3 buckets.
+
+./redirect_to_external_files.pl --report="usgcrp-climate-human-health-assessment-2016" --location="https://climatehealth2016.s3.amazonaws.com/climatehealth2016/gcis-figures"
+
+NB: Each report requires a new subfunction that knows the naming scheme of the files in their new location.
+
+=cut
+
 use Getopt::Long qw/GetOptions/;
 use Pod::Usage qw/pod2usage/;
 
@@ -157,48 +203,3 @@ sub health_2016 {
 
 1;
 
-=head1 NAME
-
-redirect_to_external_files.pl - redo the location of assets
-
-=head1 DESCRIPTION
-
-redirect_to_external_files - given a report, a location, and a new name
-scheme, update the file paths for that report's assets.
-
-=head1 SYNOPSIS
-
-./redirect_to_external_files.pl --report="report-identifier" --location="shared-base-url" [OPTIONS]
-
-=head1 OPTIONS
-
-=over
-
-=item B<--client>
-
-The GCIS instance you would like to interact with (e.g. https://data-stage.globalchange.gov)
-
-=item B<--location>
-
-The base URL for the new location of the assets. WIll end up in the 'location' field
-for the report's files.
-
-=item B<--report>
-
-The report identifier whos assets are being modified
-
-=item B<--dry-run>
-
-Don't actually make the DB changes, but report out what they would be.
-
-=back
-
-=head1 EXAMPLES
-
-Make all of the 2016 Health Assessment assets point to the S3 buckets.
-
-./redirect_to_external_files.pl --report="usgcrp-climate-human-health-assessment-2016" --location="https://climatehealth2016.s3.amazonaws.com/climatehealth2016/gcis-figures"
-
-NB: Each report requires a new subfunction that knows the naming scheme of the files in their new location.
-
-=cut

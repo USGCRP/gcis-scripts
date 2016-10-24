@@ -1,5 +1,54 @@
 #!/usr/bin/env perl
 
+=head1 NAME
+
+get-files.pl -- get files for a report from gcis instance
+
+=head1 DESCRIPTION
+
+get-files.pl -- gets the files for an entire report from the original gcis 
+instance.  The report source is a yaml file (see export-report.pl).  The gcis 
+instance is the one specified in the report.  The files are stored in a local
+directory.
+
+If the file already exists in the local directory, it is skipped.
+
+=head1 SYNOPSIS
+
+./get-files.pl [OPTIONS]
+
+=head1 OPTIONS
+
+=over
+
+=item B<--log_file>
+
+Log file (/tmp/gcis-get-files.log)
+
+=item B<--log_level>
+
+Log level (see Mojo::Log)
+
+=item B<--input>
+
+Input (source) report (yaml file, defaults to STDIN)
+
+=item B<--local>
+
+Directory to store file (defaults to ".")
+
+=item B<--dry_run>
+
+Set to perform dry run (no actual download)
+
+=back
+
+=head1 EXAMPLES
+
+./get-files.pl --file=report.yaml --local=./tmp
+
+=cut
+
 use Getopt::Long qw/GetOptions/;
 use Pod::Usage qw/pod2usage/;
 
@@ -80,51 +129,3 @@ sub main {
 
 1;
 
-=head1 NAME
-
-get-files.pl -- get files for a report from gcis instance
-
-=head1 DESCRIPTION
-
-get-files.pl -- gets the files for an entire report from the original gcis 
-instance.  The report source is a yaml file (see export-report.pl).  The gcis 
-instance is the one specified in the report.  The files are stored in a local
-directory.
-
-If the file already exists in the local directory, it is skipped.
-
-=head1 SYNOPSIS
-
-./get-files.pl [OPTIONS]
-
-=head1 OPTIONS
-
-=over
-
-=item B<--log_file>
-
-Log file (/tmp/gcis-get-files.log)
-
-=item B<--log_level>
-
-Log level (see Mojo::Log)
-
-=item B<--input>
-
-Input (source) report (yaml file, defaults to STDIN)
-
-=item B<--local>
-
-Directory to store file (defaults to ".")
-
-=item B<--dry_run>
-
-Set to perform dry run (no actual download)
-
-=back
-
-=head1 EXAMPLES
-
-./get-files.pl --file=report.yaml --local=./tmp
-
-=cut

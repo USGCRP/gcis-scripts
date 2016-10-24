@@ -1,52 +1,5 @@
 #!/usr/bin/env perl
 
-use Getopt::Long qw/GetOptions/;
-use Pod::Usage qw/pod2usage/;
-
-use Gcis::Client;
-use Gcis::Exim;
-use YAML::XS;
-use Data::Dumper;
-
-use strict;
-use v5.14;
-
-# $YAML::XS::Indent = 4;
-
-GetOptions(
-  'url=s'       => \(my $url),
-  'log_file=s'  => \(my $log_file = '/tmp/gcis-export.log'),
-  'log_level=s' => \(my $log_level = "info"),
-  'report=s'    => \(my $report),
-  'file=s'      => \(my $file),
-  'not_all'     => \(my $not_all),
-);
-
-pod2usage(-msg => "missing url", -verbose => 1) unless $url;
-
-&main;
-
-sub main {
-    my $s = shift;
-    my $e = Exim->new($url);
-    $e->not_all if $not_all;
-
-    my $logger = Mojo::Log->new($log_file eq '-' ? () : (path => $log_file));
-    $logger->level($log_level);
-    $e->logger($logger);
-    $e->logger_info("starting: ".$url);
-
-    my $prefix = ($report =~ /^\/report\//) ? "" : "/report/"; 
-    my $rep = $e->get("$prefix$report");
-
-    $e->get_full_report($rep->{uri});
-
-    $e->dump($file);
-    $e->logger_info('done');
-}
-
-1;
-
 =head1 NAME
 
 export-report.pl -- export report from gcis (in yaml)
@@ -97,3 +50,51 @@ Set to only export first set of items (opposite of "?all=1").
          --log_level=debug --report=/report/nca3
 
 =cut
+
+use Getopt::Long qw/GetOptions/;
+use Pod::Usage qw/pod2usage/;
+
+use Gcis::Client;
+use Gcis::Exim;
+use YAML::XS;
+use Data::Dumper;
+
+use strict;
+use v5.14;
+
+# $YAML::XS::Indent = 4;
+
+GetOptions(
+  'url=s'       => \(my $url),
+  'log_file=s'  => \(my $log_file = '/tmp/gcis-export.log'),
+  'log_level=s' => \(my $log_level = "info"),
+  'report=s'    => \(my $report),
+  'file=s'      => \(my $file),
+  'not_all'     => \(my $not_all),
+);
+
+pod2usage(-msg => "missing url", -verbose => 1) unless $url;
+
+&main;
+
+sub main {
+    my $s = shift;
+    my $e = Exim->new($url);
+    $e->not_all if $not_all;
+
+    my $logger = Mojo::Log->new($log_file eq '-' ? () : (path => $log_file));
+    $logger->level($log_level);
+    $e->logger($logger);
+    $e->logger_info("starting: ".$url);
+
+    my $prefix = ($report =~ /^\/report\//) ? "" : "/report/"; 
+    my $rep = $e->get("$prefix$report");
+
+    $e->get_full_report($rep->{uri});
+
+    $e->dump($file);
+    $e->logger_info('done');
+}
+
+1;
+

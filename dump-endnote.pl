@@ -1,5 +1,48 @@
 #!/usr/bin/env perl
 
+=head1 NAME
+
+dump-endnote.pl -- dump endnote file
+
+=head1 DESCRIPTION
+
+dump-endnote.pl -- reads references from an endnote file in xml
+format and dumps them to stdout in yaml format
+
+=head1 SYNOPSIS
+
+./dump-endnote.pl [OPTIONS]
+
+=head1 OPTIONS
+
+=over
+
+=item B<--file>
+
+Endnote file (xml format)
+
+=item B<stdout>
+
+Dump of endnote file (yaml format)
+
+=item B<--type>
+
+Type of reference to dump (e.g. 'Report'; default is 'all' : all references)
+
+=item B<--max_references>
+
+Maximumn number of references to dump (default is -1 : all references)
+
+=back
+
+=head1 EXAMPLES
+
+Dump an endnote file to stdout in yaml format
+
+./dump-endnote.pl --file endnote.xml > endnote.yaml
+
+=cut
+
 use Getopt::Long qw/GetOptions/;
 use Pod::Usage qw/pod2usage/;
 
@@ -69,45 +112,3 @@ sub main {
 
 1;
 
-=head1 NAME
-
-dump-endnote.pl -- dump endnote file
-
-=head1 DESCRIPTION
-
-dump-endnote.pl -- reads references from an endnote file in xml
-format and dumps them to stdout in yaml format
-
-=head1 SYNOPSIS
-
-./dump-endnote.pl [OPTIONS]
-
-=head1 OPTIONS
-
-=over
-
-=item B<--file>
-
-Endnote file (xml format)
-
-=item B<stdout>
-
-Dump of endnote file (yaml format)
-
-=item B<--type>
-
-Type of reference to dump (e.g. 'Report'; default is 'all' : all references)
-
-=item B<--max_references>
-
-Maximumn number of references to dump (default is -1 : all references)
-
-=back
-
-=head1 EXAMPLES
-
-Dump an endnote file to stdout in yaml format
-
-./dump-endnote.pl --file endnote.xml > endnote.yaml
-
-=cut

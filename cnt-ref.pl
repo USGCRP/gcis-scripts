@@ -1,5 +1,55 @@
 #!/usr/bin/env perl
 
+
+=head1 NAME
+
+cnt-ref.pl -- count references for a resource
+
+=head1 DESCRIPTION
+
+cnt-ref -- Counts the references for a resource such as chapters in a 
+report.
+
+=head1 SYNOPSIS
+
+./cnt-ref.pl [OPTIONS]
+
+=head1 OPTIONS
+
+=over
+
+=item B<--url>
+
+GCIS url, e.g. http://data.globalchange.gov
+
+=item B<--resource>
+
+GCIS resource, e.g. /report/nca3/chapter
+
+=item B<stdout>
+
+Count of references for the resource
+
+=item B<--all>
+
+Set to indicate all resources are to counted.
+
+=item B<--local>
+
+Directory to store file (defaults to ".")
+
+=back
+
+=head1 EXAMPLES
+
+Count the number of references for the chapters in the nca3 report
+
+./cnt-res.pl --url http://data.globalchange.gov
+             --resouce /report/nca3/chapter  --all
+
+=cut
+
+
 use Getopt::Long qw/GetOptions/;
 use Pod::Usage qw/pod2usage/;
 
@@ -74,50 +124,3 @@ sub main {
 
 1;
 
-=head1 NAME
-
-cnt-ref.pl -- count references for a resource
-
-=head1 DESCRIPTION
-
-cnt-ref -- Counts the references for a resource such as chapters in a 
-report.
-
-=head1 SYNOPSIS
-
-./cnt-ref.pl [OPTIONS]
-
-=head1 OPTIONS
-
-=over
-
-=item B<--url>
-
-GCIS url, e.g. http://data.globalchange.gov
-
-=item B<--resource>
-
-GCIS resource, e.g. /report/nca3/chapter
-
-=item B<stdout>
-
-Count of references for the resource
-
-=item B<--all>
-
-Set to indicate all resources are to counted.
-
-=item B<--local>
-
-Directory to store file (defaults to ".")
-
-=back
-
-=head1 EXAMPLES
-
-Count the number of references for the chapters in the nca3 report
-
-./cnt-res.pl --url http://data.globalchange.gov
-             --resouce /report/nca3/chapter  --all
-
-=cut

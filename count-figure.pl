@@ -1,5 +1,51 @@
 #!/usr/bin/env perl
 
+
+=head1 NAME
+
+count-figure.pl -- count figures for a resource
+
+=head1 DESCRIPTION
+
+count-figure -- Counts the figures for a resource such as chapters in a 
+report.
+
+=head1 SYNOPSIS
+
+./count-figure.pl [OPTIONS]
+
+=head1 OPTIONS
+
+=over
+
+=item B<--url>
+
+Required, GCIS url, e.g. http://data.globalchange.gov
+
+=item B<--resource>
+
+Required, GCIS resource, e.g. /report/nca3/chapter. Empty string is acceptable.
+
+=item B<stdout>
+
+Count of references for the resource
+
+=item B<--all>
+
+Set to indicate all resources are to counted.
+
+=back
+
+=head1 EXAMPLES
+
+Count the number of figures for the chapters in the nca3 report
+
+./count-figure.pl --url http://data.globalchange.gov
+             --resouce /report/nca3/chapter  --all
+
+=cut
+
+
 use Getopt::Long qw/GetOptions/;
 use Pod::Usage qw/pod2usage/;
 
@@ -136,46 +182,3 @@ sub count_act {
 
 1;
 
-=head1 NAME
-
-count-figure.pl -- count figures for a resource
-
-=head1 DESCRIPTION
-
-count-figure -- Counts the figures for a resource such as chapters in a 
-report.
-
-=head1 SYNOPSIS
-
-./count-figure.pl [OPTIONS]
-
-=head1 OPTIONS
-
-=over
-
-=item B<--url>
-
-Required, GCIS url, e.g. http://data.globalchange.gov
-
-=item B<--resource>
-
-Required, GCIS resource, e.g. /report/nca3/chapter. Empty string is acceptable.
-
-=item B<stdout>
-
-Count of references for the resource
-
-=item B<--all>
-
-Set to indicate all resources are to counted.
-
-=back
-
-=head1 EXAMPLES
-
-Count the number of figures for the chapters in the nca3 report
-
-./count-figure.pl --url http://data.globalchange.gov
-             --resouce /report/nca3/chapter  --all
-
-=cut
