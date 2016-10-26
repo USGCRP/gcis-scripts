@@ -2,49 +2,31 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+auto-merge-people.pl -- Basic person deduplication
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
+Tries to deduplicate authors based on name & OrcID. 
 
+Probably not safe to run without debugging.
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./auto-merge-people.pl URL
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
+=item URL
 
-[STDIN DESCRIPTION (if used)]
-
-=item B<--[FOO]>
-
-[FOO DESCRIPTION]
-
-=item B<--BAR>
-
-[BAR DESCRIPTION]
-
-=item B<--verbose>
-
-Verbose option [IF USED; HIGHLY ENCOURAGED]
-
-=item B<--dry_run>
-
-Dry run [IF USED; HIGHLY ENCOURAGED]
+The first item passed in must be the URL of the GCIS instance.
 
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./auto-merge-people.pl "https://data-stage.globalchange.gov"
 
 =cut
 

@@ -2,49 +2,45 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+add-article-contributors.pl -- Create Contributors for GCIS Articles
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
-
+Queries GCIS for all articles with a DOI, and then queries
+OrcID (http://pub.orcid.org) and DOI (http://dx.doi.org)
+for author information. GCIS then finds this existing
+author or creates a new one. The contributor link to the
+article is created.
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./add-article-contributors.pl [OPTIONS]
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
+=item B<--url>
 
-[STDIN DESCRIPTION (if used)]
+The GCIS instance URL
 
-=item B<--[FOO]>
+=item B<--dump>
 
-[FOO DESCRIPTION]
+Dumps the list of authors for each doi and makes no GCIS changes.
 
-=item B<--BAR>
+=item B<--all>
 
-[BAR DESCRIPTION]
+All articles, or just the first 20?
 
-=item B<--verbose>
+=item B<--dry_run> or B<--n>
 
-Verbose option [IF USED; HIGHLY ENCOURAGED]
-
-=item B<--dry_run>
-
-Dry run [IF USED; HIGHLY ENCOURAGED]
+Dry run, no changes to GCIS.
 
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./add-article-contributors.pl --url "https://data.globalchange.gov" --all
 
 =cut
 

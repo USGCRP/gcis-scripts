@@ -2,49 +2,32 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+change-contributors.pl -- ORNL datasets Contributor update
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
+Finds all datasets in GCIS with 'ornl' in the title,
+removes the Contributors associated with them and
+adds the single Contributor 'organization/accenture'.
 
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./change-contributors.pl GCIS_URL
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
+=item <GCIS_URL>
 
-[STDIN DESCRIPTION (if used)]
-
-=item B<--[FOO]>
-
-[FOO DESCRIPTION]
-
-=item B<--BAR>
-
-[BAR DESCRIPTION]
-
-=item B<--verbose>
-
-Verbose option [IF USED; HIGHLY ENCOURAGED]
-
-=item B<--dry_run>
-
-Dry run [IF USED; HIGHLY ENCOURAGED]
+The host running our GCIS instance.
 
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./change-contributors.pl "https://data-stage.globalchange.gov"
 
 =cut
 
