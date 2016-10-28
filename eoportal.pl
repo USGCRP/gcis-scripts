@@ -2,61 +2,42 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+eoportal.pl -- Get some thumbnails and quotes from eoportal, and put them into GCIS.
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
+Given a platform, or for all platforms, if there exists a
+ceos lexicon for the platform go out to the eoportal
+and pull down info. Saves the image as a file and any 
+description
 
+Does not seem safe to run twice.
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./eoportal.pl <GCIS_URL> <PLATFORM_URI>
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
+=item <GCIS_URL>
 
-[STDIN DESCRIPTION (if used)]
+The instance of GCIS to query & update
 
-=item B<--[FOO]>
+=item <PLATFORM_URI>
 
-[FOO DESCRIPTION]
-
-=item B<--BAR>
-
-[BAR DESCRIPTION]
-
-=item B<--verbose>
-
-Verbose option [IF USED; HIGHLY ENCOURAGED]
-
-=item B<--dry_run>
-
-Dry run [IF USED; HIGHLY ENCOURAGED]
+The specific platform to update. If not provided, all are updated.
 
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./eoportal.pl                                                     # default is localhost:3000
+./eoportal.pl https://data-stage.globalchange.gov                 # all platforms
+./eoportal.pl https://data-stage.globalchange.gov /platform/aqua  # one platform
 
 =cut
-
-# eoportal.pl
-#   Get some thumbnails and quotes from eoportal, and put them into GCIS.
-
-# Sample usage :
-#
-# ./eoportal.pl                                                     # default is localhost:3000
-# ./eoportal.pl https://data-stage.globalchange.gov                 # all platforms
-# ./eoportal.pl https://data-stage.globalchange.gov /platform/aqua  # one platform
-#
 
 use Path::Class qw/file/;
 use Mojo::DOM;

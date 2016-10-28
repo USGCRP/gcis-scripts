@@ -2,57 +2,33 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+get_echo.pl -- gets echo10 data and stores XML files by archive center
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
-
+Grabs the echo10 dataset data from nasa and stows it
+in an XML file.
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./get_echo.pl <output_dir>
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
+=item <output_dir>
 
-[STDIN DESCRIPTION (if used)]
-
-=item B<--[FOO]>
-
-[FOO DESCRIPTION]
-
-=item B<--BAR>
-
-[BAR DESCRIPTION]
-
-=item B<--verbose>
-
-Verbose option [IF USED; HIGHLY ENCOURAGED]
-
-=item B<--dry_run>
-
-Dry run [IF USED; HIGHLY ENCOURAGED]
+The directory to save the file(s)
 
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./get_echo.pl /tmp/output_dir/
 
 =cut
 
-#
-# get-echo.pl
-#
-# gets echo10 data and stored XML files by archive center
-#
 use v5.20;
 use Mojo::UserAgent;
 use Mojo::DOM;
