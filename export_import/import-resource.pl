@@ -2,53 +2,62 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+import-resource -- move resource type between GCIS's
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
+Given the (hardcoded) source and destination GCIS's,
+grab all of the given resource from each GCIS and
 
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./import-resource [resource_name]
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
+=item [resource_name]
 
 [STDIN DESCRIPTION (if used)]
+the type of resource we're updating. Valid values:
 
-=item B<--[FOO]>
+=over
 
-[FOO DESCRIPTION]
+=item reference
 
-=item B<--BAR>
+=item article
 
-[BAR DESCRIPTION]
+=item book
 
-=item B<--verbose>
+=item generic
 
-Verbose option [IF USED; HIGHLY ENCOURAGED]
+=item report
 
-=item B<--dry_run>
+=item webpage
 
-Dry run [IF USED; HIGHLY ENCOURAGED]
+=item journal
+
+=item dataset
+
+=item person
+
+default value
+
+=item organization
+
+=back
 
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./import-resource article
 
 =cut
 
-use v5.20.1;
+use v5.20.0;
 use Mojo::UserAgent;
 use Gcis::Client;
 use Gcis::Exim;
@@ -57,7 +66,7 @@ use Text::Diff qw/diff/;
 use Data::Dumper;
 
 my $src_url = q[http://data-stage.globalchange.gov];
-my $dst_url = q[https://data.gcis-dev-front.joss.ucar.edu];
+my $dst_url = q[https://data-dev.globalchange.gov];
 my $what = $ARGV[0] || q[person];
 my $verbose = 1;
 my $dry_run = 1;
