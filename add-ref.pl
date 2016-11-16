@@ -2,18 +2,17 @@
 
 =head1 NAME
 
-update-attrs.pl -- update citation attributes
+add-ref.pl -- add a reference from yaml
 
 =head1 DESCRIPTION
 
-update-attrs.pl updates the attributes of a citation.
+add-ref.pl adds a reference to GCIS
 
-An attribute is deleted if the input value is null.  No update is made if the 
-existing and the update values are the same.
+No change is made if the reference exists.
 
 =head1 SYNOPSIS
 
-./update-attrs.pl [OPTIONS]
+./add-ref.pl [OPTIONS]
 
 =head1 OPTIONS
 
@@ -25,12 +24,7 @@ GCIS url, e.g. http://data-stage.globalchange.gov
 
 =item B<--file>
 
-File containing the citation to be updated and the updated information (yaml 
-format, more informatoin in example)
-
-=item B<--max_updates>
-
-Maximum number of update (defaults to 20)
+File containing the reference to be created and the information
 
 =item B<--verbose>
 
@@ -44,34 +38,46 @@ Set to perform dry run (no actual update)
 
 =head1 EXAMPLES
 
-./update-attrs.pl -u http://data-stage.globalchange.gov < update_list.yaml
+./add-ref.pl -u http://data-stage.globalchange.gov < new_ref.yaml
 
 Example input file (yaml format):
 
-    ---
-    - uri: /reference/11112222-3333-4444-5555-666677778888
-      URL: http://new_www.org/data/doc/12345.6789
+  ---
+  - uri: /reference/6ca055db-9671-4dbc-9d65-aa72ac9e9510
+    .place_published: 'Fairbanks, Alaska, USA'
+    .publisher: Alaska Center for Climate Change Assessment and Policy
+    .reference_type: 0
+    Author: 'Lindsey, S.'
+    Issue: Spring 2011
+    Publication: Alaska Climate Dispatch
+    Pages: 1-5
+    Title: Spring breakup and ice-jam flooding in Alaska
+    URL: http://accap.uaf.edu/sites/default/files/2011a_Spring_Dispatch.pdf
+    Year: 2011
+    _chapter: '["Ch. 22: Alaska FINAL"]'
+    _record_number: 1583
+    _uuid: 6ca055db-9671-4dbc-9d65-aa72ac9e9510
+    reftype: 'Electronic Article'
+
 
 =cut
 
 use Getopt::Long qw/GetOptions/; use Pod::Usage qw/pod2usage/;
 
 use Gcis::Client; use YAML::XS; use Data::Dumper; use Clone::PP qw(clone);
-# use Tuba::Util qw(new_uuid);
 
 use strict; use v5.14;
 
 GetOptions(
-  'url=s' => \(my $url),
-  'file=s' => \(my $file),
-  'max_updates=i' => \(my $max_updates = 20),
-  'verbose' => \(my $verbose),
+  'url=s'     => \(my $url),
+  'file=s'    => \(my $file),
+  'verbose'   => \(my $verbose),
   'dry_run|n' => \(my $dry_run),
-  'help|?'  => sub { pod2usage(verbose => 2) }, ) or die pod2usage(verbose => 
-1);
+  'help|?'    => sub { pod2usage(verbose => 2) },
+) or die pod2usage(verbose => 1);
 
-pod2usage(msg => "missing url", verbose => 1) unless $url; pod2usage(msg => 
-"missing file", verbose => 1) unless $file;
+pod2usage(msg => "missing url", verbose => 1) unless $url;
+pod2usage(msg => "missing file", verbose => 1) unless $file;
 
 my $n_updates = 0;
 
@@ -79,10 +85,9 @@ my $n_updates = 0;
 
 sub main {
 
-    say " updating attributes";
+    say " adding reference";
     say " url : $url";
     say " file : $file";
-    say " max updates : $max_updates";
     say " verbose on" if $verbose;
     say " dry run" if $dry_run;
 
@@ -90,9 +95,9 @@ sub main {
                        Gcis::Client->connect(url => $url);
 
     my $y = load_ref($file);
-    say " uri: $y->{uri}";
+    say " uri: $y->[0]->{uri}";
     say " y :\n".Dumper($y) if $verbose;
-    add_ref($g, $y);
+    add_ref($g, $y->[0]);
     say "done";
 }
 
