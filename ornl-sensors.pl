@@ -2,49 +2,30 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+./ornl-sensors.pl - populate ornl sensor lexicon
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
-
+Pushes the DATA section into the supplied GCIS instance's
+lexicon
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./ornl-sensors.pl GCIS_URL
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
+=item GCIS_URL
 
-[STDIN DESCRIPTION (if used)]
-
-=item B<--[FOO]>
-
-[FOO DESCRIPTION]
-
-=item B<--BAR>
-
-[BAR DESCRIPTION]
-
-=item B<--verbose>
-
-Verbose option [IF USED; HIGHLY ENCOURAGED]
-
-=item B<--dry_run>
-
-Dry run [IF USED; HIGHLY ENCOURAGED]
+The URL of the GCIS instance to populate.
 
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./ornl-sensors.pl https://data-stage.globalchange.gov
 
 =cut
 

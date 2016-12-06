@@ -2,49 +2,59 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
-
-=head1 DESCRIPTION
-
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
-
+./to-generic - creates child pubs of class "generic" for non-standard reference types, associates them with reference 
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+togeneric [options]
+  Options:
+    -type refers to the type of reference to be updated.
+    -url refers to the URL of the GCIS instance.
+    -max_update is the maximum number of entries to update.
+    -dry_run is a flag that indicates a dry run.
+    -help provides a brief help message. 
 
 =head1 OPTIONS
 
-=over
+=over 8
 
-=item <stdin>
+=item B<-type>
 
-[STDIN DESCRIPTION (if used)]
+the type of reference to be updated (default is cproc) the allowed values are:
+    marticle : Magazine Article
+    narticle : Newspaper Article
+    earticle : Electronic Article
+    cpaper : Conference Paper
+    cproc : Conference Proceedings
+    thesis : Thesis
+    film : Film or Broadcast 
 
-=item B<--[FOO]>
+=item B<-url>
 
-[FOO DESCRIPTION]
+the URL of the GCIS instance (default is the dev instance) 
 
-=item B<--BAR>
+=item B<-max_update>
 
-[BAR DESCRIPTION]
+the maximum number of entries to update (default is 1 entry) 
 
-=item B<--verbose>
+=item B<-dry_run>
 
-Verbose option [IF USED; HIGHLY ENCOURAGED]
+a flag that indicates a dry run (default is to update the instance) 
 
-=item B<--dry_run>
+=item B<-help>
 
-Dry run [IF USED; HIGHLY ENCOURAGED]
+prints a help message and exits 
 
-=back
+=back 
 
-=head1 EXAMPLES
+=head1 DESCRIPTION
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+B<togeneric.pl> creates child publications of class 'generic' for
+reference types of nonstandard reference type classes.  The child
+pubs are subsequently associcated with these references.  The
+program is designed to allow users to select how many new child
+pubs to create, and displays the title and UUID pertaining to
+each new child pub entry generated. 
 
 =cut
 
@@ -167,26 +177,4 @@ my $refs = $g->get($ref_search); my $n = @$refs; say " n refs : $n"; my $n_updat
 say "done"; 
 __END__ 
 
-=head1 NAME to-generic - creates child pubs of class "generic" for non-standard reference types, associates them with reference =head1 SYNOPSIS togeneric [options]
-  Options:
-    -type refers to the type of reference to be updated.
-    -url refers to the URL of the GCIS instance.
-    -max_update is the maximum number of entries to update.
-    -dry_run is a flag that indicates a dry run.
-    -help provides a brief help message. 
 
-=head1 OPTIONS =over 8 =item B<-type> the type of reference to be updated (default is cproc) the allowed values are:
-    marticle : Magazine Article
-    narticle : Newspaper Article
-    earticle : Electronic Article
-    cpaper : Conference Paper
-    cproc : Conference Proceedings
-    thesis : Thesis
-    film : Film or Broadcast =item B<-url> the URL of the GCIS instance (default is the dev 
-instance) =item B<-max_update> the maximum number of entries to update (default is 1 entry) =item 
-B<-dry_run> a flag that indicates a dry run (default is to update the instance) =item B<-help> 
-prints a help message and exits =back =head1 DESCRIPTION B<togeneric.pl> creates child publications 
-of class 'generic' for reference types of nonstandard reference type classes.  The child pubs are 
-subsequently associcated with these references.  The program is designed to allow users to select 
-how many new child pubs to create, and displays the title and UUID pertaining to each new child pub 
-entry generated. =cut

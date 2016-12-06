@@ -2,49 +2,33 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+./merge-people.pl -- merge people
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
-
+Interactively merge two persons on the given GCIS instance.
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./merge-people.pl gcis_url person_id_1 person_id_2 [person_id_n]
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
+=item [gcis_url]
 
-[STDIN DESCRIPTION (if used)]
+The GCIS instance to connect to
 
-=item B<--[FOO]>
+=item [person_id]
 
-[FOO DESCRIPTION]
-
-=item B<--BAR>
-
-[BAR DESCRIPTION]
-
-=item B<--verbose>
-
-Verbose option [IF USED; HIGHLY ENCOURAGED]
-
-=item B<--dry_run>
-
-Dry run [IF USED; HIGHLY ENCOURAGED]
+Two or more Person IDs to merge
 
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./merge-people.pl https://data-stage.globalchange.gov 3041 2342 
 
 =cut
 

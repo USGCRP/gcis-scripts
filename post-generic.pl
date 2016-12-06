@@ -2,49 +2,26 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+./post-generic.pl - basic generic publication post test
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
-
+Posts a test Generic Publication to a locally running GCIS
+instance
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./post-generic.pl 
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
-
-[STDIN DESCRIPTION (if used)]
-
-=item B<--[FOO]>
-
-[FOO DESCRIPTION]
-
-=item B<--BAR>
-
-[BAR DESCRIPTION]
-
-=item B<--verbose>
-
-Verbose option [IF USED; HIGHLY ENCOURAGED]
-
-=item B<--dry_run>
-
-Dry run [IF USED; HIGHLY ENCOURAGED]
-
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./post-generic.pl 
 
 =cut
 

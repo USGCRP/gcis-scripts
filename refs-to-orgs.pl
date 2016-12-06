@@ -2,56 +2,42 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+./refs-to-orgs.pl -- create orgs from refs
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
-
+Pulls all references from the provided report and
+populates any missing organizations in those
+references. Associate those orgs with the
+reference from which they came.
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./refs-to-orgs [-n] <url> <report>
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
+=item <url>
 
-[STDIN DESCRIPTION (if used)]
+URL of the GCIS instance
 
-=item B<--[FOO]>
+=item <report>
 
-[FOO DESCRIPTION]
+The associated report for these references
 
-=item B<--BAR>
+=item B<-n>
 
-[BAR DESCRIPTION]
-
-=item B<--verbose>
-
-Verbose option [IF USED; HIGHLY ENCOURAGED]
-
-=item B<--dry_run>
-
-Dry run [IF USED; HIGHLY ENCOURAGED]
+Dry run mode
 
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./refs-to-orgs -n https://data-stage.globalchange.gov nca3
 
 =cut
-
-# Convert organizations in bibliographic entries (which are
-# of type 'Report') into orgs.  Associate those orgs with
-# the reference from which they came.
-
 
 use v5.14;
 

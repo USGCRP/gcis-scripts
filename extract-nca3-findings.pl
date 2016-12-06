@@ -2,49 +2,34 @@
 
 =head1 NAME
 
-[FILENAME] -- [ONE LINE DESCRIPTION]
+extract-nca3-findings.pl
 
 =head1 DESCRIPTION
 
-[FULL EXPLANATION OF THE SCRIPT. Remember to explain the
-'Why' and 'How' as well as the 'What'. Make note of any
-externalities, such as GCIS (very common), CrossRef.org,
-IO files, etc ]
-
+Given HTML verions of the NCA3 chapters, extracts the
+key findings into YAML format. One off script?
 
 =head1 SYNOPSIS
 
-[GENERIC SCRIPT RUN e.g.: "./FILENAME [OPTIONS] < FOO.TXT"]
+./extract-nca3-findings.pl [file.html] >output.yaml
 
 =head1 OPTIONS
 
 =over
 
-=item <stdin>
+=item <file.html>
 
-[STDIN DESCRIPTION (if used)]
+HTML version of an NCA3 chapter
 
-=item B<--[FOO]>
+=item <output.yaml>
 
-[FOO DESCRIPTION]
-
-=item B<--BAR>
-
-[BAR DESCRIPTION]
-
-=item B<--verbose>
-
-Verbose option [IF USED; HIGHLY ENCOURAGED]
-
-=item B<--dry_run>
-
-Dry run [IF USED; HIGHLY ENCOURAGED]
+The key findings in YAML format. See sample at EOF.
 
 =back
 
 =head1 EXAMPLES
 
-[REALISTIC SCRIPT RUN e.g. `./FILENAME --foo --verbose <input.txt`]
+./extract-nca3-findings.pl html/ch02/ch02.html > findings/ch02.yaml;
 
 =cut
 
