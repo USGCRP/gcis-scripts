@@ -223,7 +223,7 @@ say "   do_not_add_journals" if $do_not_add_journals;
 say "   do_not_add_items" if $do_not_add_items;
 say "   do_not_add_referneces" if $do_not_add_references;
 say "   errata_file : $errata_file" if $errata_file;
-say "   diff_file : $diff_file";
+say "   diff_file : $diff_file" if $diff_file;
 say "   alt_id_file : $alt_id_file" if $alt_id_file;
 say "   verbose" if $verbose;
 say "   dry_run" if $dry_run;
@@ -1299,14 +1299,20 @@ sub main {
 
     my %map = (
        'Book' => 'book',
+       'Edited Book' => 'book',
+       'Electronic Book' => 'book',
        'Book Section' => 'book_section', 
+       'Electronic Book Section' => 'book_section',
+       'Report' => 'report',
+       'Manuscript' => 'report',
+       'Journal Article' => 'article',
+       'Web Page' => 'webpage',
+       'Dataset' => 'dataset',
        'Conference Paper' => 'generic_cpaper', 
        'Online Multimedia' => 'generic_media',
-       'Journal Article' => 'article',
        'Legal Rule or Regulation' => 'generic_legal', 
        'Press Release' => 'generic_press', 
-       'Report' => 'report',
-       'Web Page' => 'webpage',
+       'Aggregated Database' => 'generic_aggregateDB',
     );
     my @which = qw(article report webpage);
     my $bib_only = 1;
