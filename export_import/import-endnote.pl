@@ -174,62 +174,116 @@ GetOptions(
 
 pod2usage(msg => "missing url or endnote file", verbose => 1) unless ($url && $endnote_file);
 
-my %diff;
-my $n_updates = 0;
-my %stats;
+## Data Maps
+
+my %TYPE_MAP = (
+   'Book' => 'book',
+   'Edited Book' => 'book',
+   'Electronic Book' => 'book',
+   'Book Section' => 'book_section', 
+   'Electronic Book Section' => 'book_section',
+   'Report' => 'report',
+   'Manuscript' => 'report',
+   'Journal Article' => 'article',
+   'Web Page' => 'webpage',
+   'Dataset' => 'dataset',
+   'Conference Paper' => 'generic_cpaper', 
+   'Online Multimedia' => 'generic_media',
+   'Legal Rule or Regulation' => 'generic_legal', 
+   'Press Release' => 'generic_press', 
+   'Aggregated Database' => 'generic_aggregateDB',
+);
+
+my $BIB_TYPE_KEY_MAP = {
+    article => {
+        'Date Published' => 'Date',
+        'Publisher' => '.publisher',
+        'Publication Title' => undef,
+        'Secondary Title' => 'Journal', 
+        'ISBN' => undef, 
+    },
+    book => {
+        'Issue' => 'Edition', 
+        'Pages' => 'Number of Pages',
+        'Secondary Author' => 'Editor', 
+    },
+    book_section => {
+        'Secondary Title' => 'Book Title', 
+        'Issue' => 'Edition',
+        'Secondary Author' => 'Editor',
+    },
+    generic_legal => {
+    },
+    generic_press => {
+    },
+    generic_media => {
+        'Secondary Title' => 'Periodical Title', 
+        'Date' => 'E-Pub Date', 
+    },
+    generic_cpaper => {
+        'Place Published' => 'Conference Location', 
+        'Secondary Title' => 'Conference Name', 
+        'Year' => 'Year of Conference',
+    },
+    report => {
+        'Issue' => 'Number', 
+    },
+    webpage => {
+        'Issue' => 'Number', 
+    },
+};
+
+my %REF_TYPE_NUM = (
+   article => 0,
+   book => 9,
+   book_section => 7,
+   generic_legal => 32,
+   generic_press => 63,
+   generic_media => 48,
+   generic_cpaper => 47,
+   report => 10,
+   webpage => 16,
+);
+
+my %BIB_MAP = (
+    abstract      => 'Abstract',
+    doi           => 'DOI',
+    isbn          => 'ISBN',
+    issn          => 'ISSN', 
+    language      => 'Language',
+    notes         => 'Notes',
+    number        => 'Issue',
+    pages         => 'Pages',
+    pub_dates     => 'Date Published',
+    pub_location  => 'Place Published',
+    publisher     => 'Publisher',
+    record_number => '_record_number',
+    ref_key       => '_uuid',
+    reftype       => 'reftype',
+    reftype_id    => '.reference_type',
+    urls          => 'URL', 
+    volume        => 'Volume',
+    year          => 'Year',
+);
+
+my %BIB_MULTI = (
+    author => 'Author',
+    keywords => 'Keywords',
+    secondary_author => 'Secondary Author',
+    secondary_title => 'Secondary Title',
+    pub_title => 'Publication Title', 
+);
+
+
+my %DIFF;
+my $N_UPDATES = 0;
+my %STATS;
 my $skip_dois = 1;
 my $do_fix_items = 1;
-my %test;
-#     'efc237f2-b939-4902-b7c5-78c8b6249ffe' => 'ref_key', 
-#     '25c22917-41da-4f27-82db-1d40c3b4f677' => 'ref_key',
-#     '10.3354/cr027177' => 'doi', 
-#     '36921a15-271d-48d7-b648-a481bde24a94' => 'ref_key',
-#     '87031b30-75fa-495d-8a99-0df6c5eb4ced' => 'ref_key', 
-#     'http://www.ncbi.nlm.nih.gov/pmc/articles/PMC1497432/pdf/12432132.pdf' => 'urls',
-#     'http://www.ncbi.nlm.nih.gov/pubmed/6475916' => 'urls', 
-#     'http://www.cdc.gov/mmwr/preview/mmwrhtml/mm6331a1.htm' => 'urls', 
-#     '10.1021/es900518z' => 'doi',
-#     'http://www.ewra.net/wuj/pdf/WUJ_2014_08_07.pdf' => 'urls', 
-#     '94694c3f-1703-4387-b6e7-114a8d04e3de' => 'ref_key',
-#     '10.1021/es900518z' => 'doi',
-#     'http://www.cdc.gov/pcd//issues/2008/jan/07_0135.htm' => 'urls', 
-#     'http://www.cdc.gov/mmwr/preview/mmwrhtml/mm6331a1.htm' => 'urls',
-#     'doi:10.1016/j.annemergmed.2006.12.004' => 'doi',
-#     '10.1175/1520-0477(1997)078<1107:tchwhl>2.0.co;2' => 'doi', 
-#     '10.3394/0380-1330(2007)33[566:dafoec]2.0.co;2' => 'doi', 
-#     '10.3376/1081-1710(2007)32[22:CALCFP]2.0.CO;2' => 'doi', 
-#     '10.3376/1081-1710(2008)33[89:iocvom]2.0.co;2' => 'doi', 
-#     '10.1603/0022-2585(2005)042[0367:ahamdc]2.0.co;2' => 'doi', 
-#     '10.1021/es900518z' => 'doi',
-#     '10.3354/cr027177' => 'doi', 
-#     '10.1001/jama.292.19.2372' => 'doi', 
-#     '01c49cdf-06bb-41ef-95be-37a8553295b7' => 'ref_key',
-#     '10.1002/etc.2046' => 'doi',
-#     '10.1001/archinternmed.2011.683' => 'doi',
-#     '197d65cd-c05e-4ddb-8a9d-5a9aed134974' => 'ref_key',
-my %test_jou;
-#     'disaster-medicine-public' => 'journal',
-#     'international-journal-environmental-research--public-health' => 'journal',
-#     'philosophical-transactions-royal-society-b-biological-sciences' => 'journal', 
-#     'philosophical-transactions-royal-society-a-mathematical-physical-and-engineering-sciences' => 'journal', 
-#     'atmospheric-chemistry-physics' => 'journal', 
-
-say " importing endnote references";
-say "   url : $url";
-say "   endnote_file : $endnote_file";
-say "   max_updates : $max_updates";
-say "   max_references : $max_references";
-say "   do_not_add_journals" if $do_not_add_journals;
-say "   do_not_add_items" if $do_not_add_items;
-say "   do_not_add_referneces" if $do_not_add_references;
-say "   errata_file : $errata_file" if $errata_file;
-say "   diff_file : $diff_file" if $diff_file;
-say "   alt_id_file : $alt_id_file" if $alt_id_file;
-say "   verbose" if $verbose;
-say "   dry_run" if $dry_run;
-say '';
 
 &main;
+
+# Utility Function to convert XML escaped values into plaintext
 
 sub xml_unescape {
   my $str = shift;
@@ -256,6 +310,8 @@ sub xml_unescape {
   return $str;
 }
 
+# Turns a string into a GCIS-compatible word-based identifier
+
 sub make_identifier {
     my $str = shift or return undef;
     my $max_char = shift;
@@ -277,585 +333,621 @@ sub make_identifier {
     return $id;
 }
 
-sub compare_hash {
-    my ($a, $b, $i) = @_;
+# Utility Function to compare two hashes and return a DIFF set
+# TODO why? 
 
-    my %c;
-    for (keys %{ $a }) {
-        next if $i->{$_};
-        next if !defined $a->{$_}  &&  !defined $b->{$_};
-        if (!defined $b->{$_}) {
-           $c{$_} = {_A_ => $a->{$_}, _B_ => undef};
+sub compare_hash {
+    my ($hash_a, $hash_b, $ignore) = @_;
+
+    my %hash_result;
+    for (keys %{ $hash_a }) {
+        next if $ignore->{$_};
+        next if !defined $hash_a->{$_}  &&  !defined $hash_b->{$_};
+        if (!defined $hash_b->{$_}) {
+           $hash_result{$_} = {_A_ => $hash_a->{$_}, _B_ => undef};
            next;
         }
-        if (!defined $a->{$_}) {
-           $c{$_} = {_A_ => undef, _B_ => $b->{$_}};
+        if (!defined $hash_a->{$_}) {
+           $hash_result{$_} = {_A_ => undef, _B_ => $hash_b->{$_}};
            next;
         }
-        if (ref $a->{$_} eq 'HASH') {
-            my $c1 = compare_hash($a->{$_}, $b->{$_}, $i) or next;
-            $c{$_} = $c1;
+        if (ref $hash_a->{$_} eq 'HASH') {
+            my $hash_c1 = compare_hash($hash_a->{$_}, $hash_b->{$_}, $ignore) or next;
+            $hash_result{$_} = $hash_c1;
             next;
         }
-        next if $a->{$_} eq $b->{$_};
-        my $a1 = lc xml_unescape($a->{$_});
-        my $b1 = lc xml_unescape($b->{$_});
-        for ($a1, $b1) {
+        next if $hash_a->{$_} eq $hash_b->{$_};
+        my $hash_a1 = lc xml_unescape($hash_a->{$_});
+        my $hash_b1 = lc xml_unescape($hash_b->{$_});
+        for ($hash_a1, $hash_b1) {
             s/^\s+//; s/\s+$//; s/\.$//; s/\r/; /g;
         }
-        next if $a1 eq $b1;
+        next if $hash_a1 eq $hash_b1;
         if (lc $_ eq 'author') {
-            next if compare_author($a1, $b1);
+            next if compare_author($hash_a1, $hash_b1);
         }
-        $c{$_} = {_A_ => $a->{$_}, _B_ => $b->{$_}};
+        $hash_result{$_} = {_A_ => $hash_a->{$_}, _B_ => $hash_b->{$_}};
     }
-    return %c ? \%c : undef;
+    return %hash_result ? \%hash_result : undef;
 }
+
+# Utility Function to compare if two authors are the same
 
 sub compare_author {
-    my ($a, $b) = @_;
-    my @a1 = split '; ', $a;
-    my @b1 = split '; ', $b;
-    for my $a2 (@a1) {
-        my $b2 = shift @b1;
-        return 0 unless $b2;
-        my ($al, $af) = split ', ', $a2;
-        my ($bl, $bf) = split ', ', $b2;
-        return 0 if $al ne $bl;
-        next if !$af && !$bf;
-        return 0 if $af && !$bf;
-        return 0 if $bf && !$af;
-        return 0 if substr($af, 0, 1) ne substr($bf, 0, 1);
+    my ($author_a, $author_b) = @_;
+    my @author_a1 = split '; ', $author_a;
+    my @author_b1 = split '; ', $author_b;
+    for my $author_a2 (@author_a1) {
+        my $author_b2 = shift @author_b1;
+        return 0 unless $author_b2;
+        my ($author_al, $author_af) = split ', ', $author_a2;
+        my ($author_bl, $author_bf) = split ', ', $author_b2;
+        return 0 if $author_al ne $author_bl;
+        next if !$author_af && !$author_bf;
+        return 0 if $author_af && !$author_bf;
+        return 0 if $author_bf && !$author_af;
+        return 0 if substr($author_af, 0, 1) ne substr($author_bf, 0, 1);
     }
     return 1;
 }
+
+# Utility Function to remove any undef values in a hash
+# TODO why?
 
 sub remove_undefs {
-    my $v = shift;
-    ref $v eq 'HASH' or return 0;
-    for (keys %{ $v }) {
-        if (ref $v->{$_} eq 'HASH') {
-            remove_undefs($v->{$_});
-            undef $v->{$_} unless keys %{ $v->{$_} } > 0;
+    my $suspicious_hash = shift;
+    ref $suspicious_hash eq 'HASH' or return 0;
+    for (keys %{ $suspicious_hash }) {
+        if (ref $suspicious_hash->{$_} eq 'HASH') {
+            remove_undefs($suspicious_hash->{$_});
+            undef $suspicious_hash->{$_} unless keys %{ $suspicious_hash->{$_} } > 0;
         }
-        delete $v->{$_} unless defined $v->{$_};
+        delete $suspicious_hash->{$_} unless defined $suspicious_hash->{$_};
     }
     return 1;
 }
 
-sub update_item {
-    my ($g, $j) = @_;
+# Given a GCIS Handle and the new Resource's info hash, update the Resource in GCIS.
 
-    my $u = $j->{uri};
-    my ($t) = ($u =~ /^\/(.*?)\//);
+sub update_item {
+    my ($gcis_handle, $gcis_resource) = @_;
+
+    my $resource_uri = $gcis_resource->{uri};
+    my ($resource_path) = ($resource_uri =~ /^\/(.*?)\//);
 
     if ($dry_run) {
-        say " would update $t : $u";
-        $n_updates++;
-        $stats{"would_update_$t"}++;
+        say " would update $resource_path : $resource_uri";
+        $N_UPDATES++;
+        $STATS{"would_update_$resource_path"}++;
         return 1;
     }
 
-    say " updating $t : $u";
-    $stats{"updated_$t"}++;
-    my $n = clone($j);
-    remove_undefs($n);
-    delete $n->{uri};
+    say " updating $resource_path : $resource_uri";
+    $STATS{"updated_$resource_path"}++;
+    my $cloned_resource = clone($gcis_resource);
+    remove_undefs($cloned_resource);
+    delete $cloned_resource->{uri};
     my @extra = qw(articles child_publication cited_by 
                    contributors files href 
                    parents publications references);
     push @extra, qw(chapters report_figures 
-                    report_findings report_tables) if $t eq 'report';
+                    report_findings report_tables) if $resource_path eq 'report';
     for (@extra) {
-        delete $n->{$_} if $n->{$_};
+        delete $cloned_resource->{$_} if $cloned_resource->{$_};
     }
-    $n_updates++;
-    my $i = $g->post($u, $n) or die " unable to update $t : $u";
+    $N_UPDATES++;
+    my $updated_resource = $gcis_handle->post($resource_uri, $cloned_resource) or die " unable to update $resource_path : $resource_uri";
     sleep($wait) if $wait > 0;
 
-    return $i->{uri};
+    return $updated_resource->{uri};
 }
+
+# Given a GCIS Handle and the new Resource's info hash, create the Resource in GCIS.
 
 sub add_item {
-    my ($g, $j) = @_;
+    my ($gcis_handle, $new_resource) = @_;
 
-    my $u = $j->{uri};
-    my ($t) = ($u =~ /^\/(.*?)\//);
+    my $new_resource_uri = $new_resource->{uri};
+    my ($new_resource_path) = ($new_resource_uri =~ /^\/(.*?)\//);
 
     if ($dry_run) {
-        say " would add $t : $u";
-        $n_updates++;
-        $stats{"would_add_$t"}++;
+        say " NOTE: would add $new_resource_path : $new_resource_uri";
+        $N_UPDATES++;
+        $STATS{"would_add_$new_resource_path"}++;
         return 1;
     }
 
-    say " adding $t : $u";
-    $stats{"added_$t"}++;
-    my $n = clone($j);
-    remove_undefs($n);
-    delete $n->{uri};
-    if ($t eq 'article') {
-        delete $n->{$_} for qw(uri author pmid);
+    say " adding $new_resource_path : $new_resource_uri";
+    $STATS{"added_$new_resource_path"}++;
+    my $cloned_new_resource = clone($new_resource);
+    remove_undefs($cloned_new_resource);
+    delete $cloned_new_resource->{uri};
+    if ($new_resource_path eq 'article') {
+        delete $cloned_new_resource->{$_} for qw(uri author pmid);
     }
-    $n_updates++;
-    my $i = $g->post("/$t", $n) or die " unable to add $t : $u";
+    $N_UPDATES++;
+    my $created_resource = $gcis_handle->post("/$new_resource_path", $cloned_new_resource) or die " unable to add $new_resource_path : $new_resource_uri";
     sleep($wait) if $wait > 0;
 
-    return $i->{uri};
+    return $created_resource->{uri};
 }
+
+# given a hash of diffs, determine if this hash can be fixed by the script
 
 sub can_fix_item {
-    my $d = shift;
-    return 0 unless $d;
-    for (keys %{ $d }) {
-        my $v = $d->{$_};
-        if (!grep "_A_" eq $_, keys %{ $v }) {
-            return 0 unless can_fix_item($v);
+    my $diff_hash = shift;
+    return 0 unless $diff_hash;
+    for (keys %{ $diff_hash }) {
+        my $value = $diff_hash->{$_};
+        if (!grep "_A_" eq $_, keys %{ $value }) {
+            return 0 unless can_fix_item($value);
             next;
         }
-        return 0 unless defined $v->{_A_};
-        return 0 if defined $v->{_B_};
+        return 0 unless defined $value->{_A_};
+        return 0 if defined $value->{_B_};
     }
     return 1;
 }
+
+# Given three hashes with existing value, fixed values, and values to ignore
+# Update the values in the fixed hash to be correct.
+# TODO: what does 'fix' imply here?
 
 sub fix_item {
-    my ($a, $b, $i) = @_;
-    for (keys %{ $a }) {
-        next if $i->{$_};
-        if (ref $a->{$_} eq 'HASH') {
-            fix_item($a->{$_}, $b->{$_}, $i);
+    my ($existing, $fixed, $ignore) = @_;
+    for (keys %{ $existing }) {
+        next if $ignore->{$_};
+        if (ref $existing->{$_} eq 'HASH') {
+            fix_item($existing->{$_}, $fixed->{$_}, $ignore);
             next;
         }
-        next unless defined $a->{$_};
-        next if defined $b->{$_};
-        $b->{$_} = $a->{$_};
+        next unless defined $existing->{$_};
+        next if defined $fixed->{$_};
+        $fixed->{$_} = $existing->{$_};
     }
     return 1;
 }
 
-sub add_child_pub {
-    my ($g, $b) = @_;
+# Given a GCIS Handle and the EndNote reference info, create the reference With a child_pub linked
 
-    my $u = $b->{uri};
+sub add_child_pub {
+    my ($gcis_handle, $child_pub_ref) = @_;
+
+    my $child_pub_uri = $child_pub_ref->{uri};
 
     if ($dry_run) {
-        say " would add child pub : $u";
-        $n_updates++;
-        $stats{would_add_child_pub}++;
+        say " NOTE: would assign child pub : $child_pub_ref->{identifier} to reference : $child_pub_uri";
+        $N_UPDATES++;
+        $STATS{would_add_child_pub}++;
         return 1;
     }
 
-    say " adding child pub : $u";
-    $stats{added_child_pub}++;
-    my $a = clone($b->{attrs});
-    remove_undefs($a);
-    $n_updates++;
-    $g->post($u, {
-        identifier => $b->{identifier},
-        attrs => $a,
-        child_publication_uri => $b->{child_publication_uri},
-        }) or die " unable to add child pub : $u";
+    say " adding child pub : $child_pub_uri";
+    $STATS{added_child_pub}++;
+    my $cloned_child_pub = clone($child_pub_ref->{attrs});
+    remove_undefs($cloned_child_pub);
+    $N_UPDATES++;
+    $gcis_handle->post($child_pub_uri, {
+        identifier => $child_pub_ref->{identifier},
+        attrs => $cloned_child_pub,
+        child_publication_uri => $child_pub_ref->{child_publication_uri},
+        }) or die " unable to add child pub : $child_pub_uri";
     sleep($wait) if $wait > 0;
 
     return 1;
 }
 
+# Given a GCIS Handle, Resource Type, Resource Field and Value, try search GCIS for the resource.
+
 sub find_item {
-    my ($g, $type, $k, $q) = @_;
+    my ($gcis_handle, $gcis_type, $search_field, $search_value) = @_;
 
-    my $qs = $q;
-    $qs = Utils::url_unescape($qs) if $k eq 'url';
-    if ($k eq 'title') {
-        $qs = Utils::strip_title($qs);
-        $qs = Utils::url_unescape($qs);
+    my $search_value_formatted = $search_value;
+    $search_value_formatted = Utils::url_unescape($search_value_formatted) if $search_field eq 'url';
+    if ($search_field eq 'title') {
+        $search_value_formatted = Utils::strip_title($search_value_formatted);
+        $search_value_formatted = Utils::url_unescape($search_value_formatted);
     }
-    $qs =~ s/ +/+/g;
-    my @a = $g->get("/search?&q=$qs&type=$type") or return undef;
+    $search_value_formatted =~ s/ +/+/g;
+    my @search_results = $gcis_handle->get("/search?&q=$search_value_formatted&type=$gcis_type") or return undef;
 
-    for my $e (@a) {
-        if ($e->{$k}) {       
-            return $e if $e->{$k} eq $q;
+    for my $search_result (@search_results) {
+        if ($search_result->{$search_field}) {
+            return $search_result if $search_result->{$search_field} eq $search_value;
         }
-        if ($k eq 'print_issn') {
-            next unless $e->{online_issn};
-            return $e if $e->{online_issn} eq $q;
-        } elsif ($k eq 'online_issn') {
-            next unless $e->{print_issn};
-            return $e if $e->{print_issn} eq $q;
-        } elsif ($k eq 'title') {
-            my $ai = make_identifier($e->{$k}) or next;
-            my $bi = make_identifier($q) or next;
-            return $e if $ai eq $bi;
-        } elsif ($k eq 'url') {
-            my $ai = Utils::url_escape($e->{$k}) or next;
-            my $bi = Utils::url_escape($q) or next;
-            return $e if $ai eq $bi;
+        if ($search_field eq 'print_issn') {
+            next unless $search_result->{online_issn};
+            return $search_result if $search_result->{online_issn} eq $search_value;
+        } elsif ($search_field eq 'online_issn') {
+            next unless $search_result->{print_issn};
+            return $search_result if $search_result->{print_issn} eq $search_value;
+        } elsif ($search_field eq 'title') {
+            my $result_title = make_identifier($search_result->{$search_field}) or next;
+            my $search_title = make_identifier($search_value) or next;
+            return $search_result if $result_title eq $search_title;
+        } elsif ($search_field eq 'url') {
+            my $result_url = Utils::url_escape($search_result->{$search_field}) or next;
+            my $search_url = Utils::url_escape($search_value) or next;
+            return $search_result if $result_url eq $search_url;
         }
     }
     return undef;
 }
 
-sub get_item {
-    my ($g, $type, $a ) = @_;
+# Given a GCIS Handle, Resource Type, and the EndNote info, find the GCIS equivalent if it exists.
 
-    my $ag;
-    for my $i (qw(doi print_issn online_issn url title other)) {
-        if ($i ne 'other') {
-           next unless $a->{$i};
-           $ag = find_item($g, $type, $i, $a->{$i});
-           last if $ag;
+sub get_item {
+    my ($gcis_handle, $gcis_type, $resource_info ) = @_;
+
+    my $resource_gcis;
+    for my $search_field (qw(doi print_issn online_issn url title other)) {
+        if ($search_field ne 'other') {
+           next unless $resource_info->{$search_field};
+           $resource_gcis = find_item($gcis_handle, $gcis_type, $search_field, $resource_info->{$search_field});
+           last if $resource_gcis;
         }
         for my $max_char (-1, 60, 40, 30) {
-            my $id = make_identifier($a->{title}, $max_char);
-            $ag = $g->get("/$type/$id");
-            last if $ag;
+            my $id = make_identifier($resource_info->{title}, $max_char);
+            $resource_gcis = $gcis_handle->get("/$gcis_type/$id");
+            last if $resource_gcis;
         }
     }
-    if (grep $type eq $_, qw(report journal article)) {
-        my $id = $ag ? $ag->{identifier} :
-                       make_identifier($a->{title}, 60);
-        $a->{identifier} = $id;
-        $a->{uri} = "/$type/$id";
+    if (grep $gcis_type eq $_, qw(report journal article)) {
+        my $id = $resource_gcis ? $resource_gcis->{identifier} :
+                       make_identifier($resource_info->{title}, 60);
+        $resource_info->{identifier} = $id;
+        $resource_info->{uri} = "/$gcis_type/$id";
     }
-    return $ag ? $ag : undef;
+    return $resource_gcis ? $resource_gcis : undef;
 }
 
+# TODO this doesn't seem to work logically. What does "fixing" a journal issn seek to do?
+
 sub fix_jou_issn {
-    my ($a, $b) = @_;
+    my ($endnote_journal, $gcis_journal) = @_;
 
-    my @v = qw(print_issn online_issn);
+    my @issns = qw(print_issn online_issn);
 
-    my $nm = 0;
-    my $na = 0;
-    my $ka;
-    my $kb;
-    for my $k (@v) {
-        next unless $a->{$k};
-        $na++;
-        for (@v) {
-            next unless $b->{$_};
-            next unless $a->{$k} eq $b->{$_};
-            $ka = $k;
-            $kb = $_;
-            $nm++;
+    my $num_match = 0;
+    my $num_endnote = 0;
+    my $outer_issn_type;
+    my $inner_issn_type;
+    for my $issn_type (@issns) {
+        next unless $endnote_journal->{$issn_type};
+        $num_endnote++;
+        for (@issns) {
+            next unless $gcis_journal->{$_};
+            next unless $endnote_journal->{$issn_type} eq $gcis_journal->{$_};
+            $outer_issn_type = $issn_type;
+            $inner_issn_type = $_;
+            $num_match++;
         }
     }
-    return 0 if $nm < 1  ||  $nm > 2;
-    if ($na < 2) {
-        $a->{$_} = $b->{$_} for @v;
+    return 0 if $num_match < 1  ||  $num_match > 2;
+    if ($num_endnote < 2) {
+        $endnote_journal->{$_} = $gcis_journal->{$_} for @issns;
         return 1;
     }
-    if ($nm > 1) {
-        return 0 if $a->{print_issn} eq $a->{online_issn};
-        return 0 if $b->{print_issn} eq $b->{online_issn};
-        $a->{$_} = $b->{$_} for @v;
+    if ($num_match > 1) {
+        return 0 if $endnote_journal->{print_issn} eq $endnote_journal->{online_issn};
+        return 0 if $gcis_journal->{print_issn} eq $gcis_journal->{online_issn};
+        $endnote_journal->{$_} = $gcis_journal->{$_} for @issns;
         return 1;
     }
-    return 0 if $ka eq $kb;
+    return 0 if $outer_issn_type eq $inner_issn_type;
 
-    my $s = $a->{$ka};
-    $a->{$ka} = $a->{$kb};
-    $a->{$kb} = $s;
+    my $s = $endnote_journal->{$outer_issn_type};
+    $endnote_journal->{$outer_issn_type} = $endnote_journal->{$inner_issn_type};
+    $endnote_journal->{$inner_issn_type} = $s;
     return 1;
 }
 
+# Given two distinct completing ISSN (endnote and gcis), on bibs and
+# the journal's issn, set the endnote bib issn to the gcis ISSN when
+# the Journal has that issn
+
 sub fix_bib_issn {
-    my ($ba, $b1, $j) = @_; 
+    my ($endnote_attrs, $gcis_attrs, $endnote_journal) = @_; 
 
-    return 0 unless $ba->{ISSN};
-    return 0 unless $b1->{ISSN};
-    return 0 if $ba->{ISSN} eq $b1->{ISSN};
+    return 0 unless $endnote_attrs->{ISSN};
+    return 0 unless $gcis_attrs->{ISSN};
+    return 0 if $endnote_attrs->{ISSN} eq $gcis_attrs->{ISSN};
 
-    my @i;
-    push @i, $j->{online_issn} if $j->{online_issn};
-    push @i, $j->{print_issn} if $j->{print_issn};
-    return 0 unless @i > 1;
-    for (@i) {
-        next unless $b1->{ISSN};
-        next unless $_ eq $b1->{ISSN};
-        $ba->{ISSN} = $b1->{ISSN};
+    my @valid_issns;
+    push @valid_issns, $endnote_journal->{online_issn} if $endnote_journal->{online_issn};
+    push @valid_issns, $endnote_journal->{print_issn} if $endnote_journal->{print_issn};
+    return 0 unless @valid_issns > 1;
+    for (@valid_issns) {
+        next unless $gcis_attrs->{ISSN};
+        next unless $_ eq $gcis_attrs->{ISSN};
+        $endnote_attrs->{ISSN} = $gcis_attrs->{ISSN};
         return 1;
     }
     return 0;
 }
 
-sub fix_doi {
-    my ($e, $a) = @_;
+# Given the errata and the article
+# correct the articles DOI
 
-    $a->{doi} or return 0;
-    my $b->{doi} = $a->{doi};
-    $b->{uri} = "/article/$a->{doi}";
-    $e->fix_errata($b);
-    $a->{doi} = $b->{doi};
+sub fix_doi {
+    my ($errata, $article) = @_;
+
+    $article->{doi} or return 0;
+    my $temp->{doi} = $article->{doi};
+    $temp->{uri} = "/article/$article->{doi}";
+    $errata->fix_errata($temp);
+    $article->{doi} = $temp->{doi};
     return 1;
 }
 
+# Given the alternate_ids and the article,
+# fidn the article_id for this article and
+# set the alternate id key name to the value
+
 sub fix_alt_id {
-     my ($ai, $a) = @_;
-     return 0 unless $a->{url};
-     my $u = $a->{url};
-     return 1 unless $ai->{$u};
-     my ($k, $i) = split '-', $ai->{$u};
-     return 0 unless $k && $i;
-     $a->{$k} = $i;
+     my ($alternate_ids, $article) = @_;
+     return 0 unless $article->{url};
+     my $url = $article->{url};
+     return 1 unless $alternate_ids->{$url};
+     my ($alt_id_name, $alt_id_valie) = split '-', $alternate_ids->{$url};
+     return 0 unless $alt_id_name && $alt_id_valie;
+     $article->{$alt_id_name} = $alt_id_valie;
      return 1;
 }
 
+# Given a resource's endnote ref, map the endnote
+# fields onto gcis fields.
+
 sub map_attrs {
-    my ($r, $ba) = @_;
+    my ($ref_handler, $attrs) = @_;
 
-    my %bib_multi = (
-        author => 'Author',
-        keywords => 'Keywords',
-        secondary_author => 'Secondary Author',
-        secondary_title => 'Secondary Title',
-        pub_title => 'Publication Title', 
-    );
-    for my $k (keys %bib_multi) {
-        next unless $r->{$k};
-        if ($k =~ /author/) {
-           ($_ =~ s/,$//) for @{ $r->{$k} };
+    for my $key (keys %BIB_MULTI) {
+        next unless $ref_handler->{$key};
+        if ($key =~ /author/) {
+           ($_ =~ s/,$//) for @{ $ref_handler->{$key} };
         }
-        my $s = xml_unescape(join '; ', @{ $r->{$k} }) or next;
-        $ba->{$bib_multi{$k}} = $s;
+        my $s = xml_unescape(join '; ', @{ $ref_handler->{$key} }) or next;
+        $attrs->{$BIB_MULTI{$key}} = $s;
     }
 
-    my %bib_map = (
-        abstract      => 'Abstract',
-        doi           => 'DOI',
-        isbn          => 'ISBN',
-        issn          => 'ISSN', 
-        language      => 'Language',
-        notes         => 'Notes',
-        number        => 'Issue',
-        pages         => 'Pages',
-        pub_dates     => 'Date Published',
-        pub_location  => 'Place Published',
-        publisher     => 'Publisher',
-        record_number => '_record_number',
-        ref_key       => '_uuid',
-        reftype       => 'reftype',
-        reftype_id    => '.reference_type',
-        urls          => 'URL', 
-        volume        => 'Volume',
-        year          => 'Year',
-    );
-    for (keys %bib_map) {
-        next unless $r->{$_};
-        $ba->{$bib_map{$_}} = $r->{$_}[0];
+    for (keys %BIB_MAP) {
+        next unless $ref_handler->{$_};
+        $attrs->{$BIB_MAP{$_}} = $ref_handler->{$_}[0];
     }
 
-    return 1 unless $ba->{Notes};
-    for ($ba->{Notes}) {
+    return 1 unless $attrs->{Notes};
+    for ($attrs->{Notes}) {
        $_ or next;
        /^ *Ch\d+/ or next;
        s/^ *//;
        s/ *$//;
-       $ba->{_chapter} = $_;
-       delete $ba->{Notes} if $_ =~ /^ *Ch\d+ *$/;
+       $attrs->{_chapter} = $_;
+       delete $attrs->{Notes} if $_ =~ /^ *Ch\d+ *$/;
     }
 
     return 1;
 }
 
 sub import_article {
-    my $p = shift;
+    my $import_args = shift;
 
-    my $g = $p->{gcis};
-    my $e = $p->{errata};
-    my $r = $p->{ref};
-    my $a;
+    my $gcis_handle = $import_args->{gcis};
+    my $errata      = $import_args->{errata};
+    my $ref_handler = $import_args->{ref};
+    my $article;
 
     say " ---";
-    $stats{n_article}++;
-    $a->{title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
-        say " no title!";
-        $stats{no_title}++;
+    $STATS{n_article}++;
+
+    # Pull article information out of the EndNote reference
+    # To build the Article Resource
+    $article->{title} = xml_unescape(join ' ', @{ $ref_handler->{title} }) or do {
+        say " ERROR: no title! : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
+        $STATS{no_title}++;
         return 0;
     };
-    for ($a->{title}) {
+    for ($article->{title}) {
         s/\(\s+/\(/g;  s/\s+\)/\)/g;
     }
 
-    my $a_map = {
+    my $article_map = {
         urls   => 'url',
         doi    => 'doi', 
         year   => 'year',
         volume => 'journal_vol',
         pages  => 'journal_pages',
     };
-    for (keys %{ $a_map }) {
-        next unless $r->{$_};
-        $a->{$a_map->{$_}} = $r->{$_}[0];
+    for (keys %{ $article_map }) {
+        next unless $ref_handler->{$_};
+        $article->{$article_map->{$_}} = $ref_handler->{$_}[0];
     }
-    $a->{author} = xml_unescape(join '; ', @{ $r->{author} });
+    $article->{author} = xml_unescape(join '; ', @{ $ref_handler->{author} });
 
-    fix_alt_id($p->{alt_ids}, \%{ $a });
-    if ($a->{doi}) {
-        fix_doi($e, $a);
-    } elsif (!$a->{pmid}) {
-        $a->{pmid} = PubMed::alt_id($a->{url}, $r->{pages}[0]) or do {
-            say " no doi or alternate id : $a->{title}";
-            $stats{no_doi_or_alternate_id}++;
+    # break out any Key-Value pairs noted as alternate ids
+    fix_alt_id($import_args->{alt_ids}, \%{ $article });
+
+    # Clean up our External Identifiers
+    if ($article->{doi}) {
+        fix_doi($errata, $article);
+    } elsif (!$article->{pmid}) {
+        $article->{pmid} = PubMed::alt_id($article->{url}, $ref_handler->{pages}[0]) or do
+        {
+            say " WARN: no doi or alternate id : $article->{title} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
+            $STATS{no_doi_or_alternate_id}++;
         };
     }
 
-    my $c;
+    # Load external versions of the article, if they exist
+    my $external_article;
     my $check_external = 0;
-    if ($a->{doi}) {
-        my $cr = CrossRef->new;
-        $c = $cr->get($a->{doi});
-        if (!$c) {
-            say " doi not in crossref : $a->{doi}";
-            $stats{doi_not_in_crossref}++;
+    if ($article->{doi}) {
+        my $crossref_handle = CrossRef->new;
+        $external_article = $crossref_handle->get($article->{doi});
+        if (!$external_article) {
+            say " WARN: doi not in crossref : $article->{doi} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
+            $STATS{doi_not_in_crossref}++;
        } else {
             $check_external = 1;
-            $a->{identifier} = $a->{doi};
+            $article->{identifier} = $article->{doi};
        }
-    } elsif ($a->{pmid}) {
-       my $pm = PubMed->new;
-       $c = $pm->get($a->{pmid}); 
-       if (!$c) {
-           say " id not in pubmed : $a->{pmid}\n   for : $a->{title}";
-           $stats{id_not_in_pubmed}++;
+    } elsif ($article->{pmid}) {
+       my $pubMed_handle = PubMed->new;
+       $external_article = $pubMed_handle->get($article->{pmid}); 
+       if (!$external_article) {
+           say " WARN: id not in pubmed : $article->{pmid}\n   for : $article->{title} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
+           $STATS{id_not_in_pubmed}++;
        } else {
            $check_external = 1;
-           $a->{identifier} = 'pmid-'.$c->{pmid};
-           $a->{pmid} = $c->{pmid};
+           $article->{identifier} = 'pmid-'.$external_article->{pmid};
+           $article->{pmid} = $external_article->{pmid};
        }
     }
-    if (!$c) {
-       $c = get_item($g, 'article', $a);
+    # Fallback on the GCIS version of the article
+    if (!$external_article) {
+       $external_article = get_item($gcis_handle, 'article', $article);
     }
-    $a->{uri} = "/article/$a->{identifier}";
 
-    my $j;
-    $j->{title} = xml_unescape($r->{secondary_title}[0]) or do {
-        say " no journal title : $a->{identifier}";
-        $stats{no_journal_title}++;
+    $article->{uri} = "/article/$article->{identifier}";
+
+    # Build the Journal Resource
+    my $journal;
+    $journal->{title} = xml_unescape($ref_handler->{secondary_title}[0]) or do {
+        say " ERROR: no journal title : $article->{identifier} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
+        $STATS{no_journal_title}++;
         return 0;
     };
 
-    $j->{print_issn} = $c->{issn}[0];
-    $j->{online_issn} = $c->{issn}[1];
-    $j->{publisher} = $c->{publisher};
+    $journal->{print_issn} = $external_article->{issn}[0];
+    $journal->{online_issn} = $external_article->{issn}[1];
+    $journal->{publisher} = $external_article->{publisher};
 
-    my $jg = get_item($g, 'journal', $j);
-    $e->fix_errata($j);
+    # Pull any matching existing GCIS Journal
+    my $journalGCIS = get_item($gcis_handle, 'journal', $journal);
 
-    say " jou :\n".Dumper($j) if $verbose;
+    # Apply errata? TODO 
+    $errata->fix_errata($journal);
 
-    if (!$jg) {
-        if (!$j->{print_issn}  &&  !$j->{online_issn}) {
-            say " no journal issn : $j->{uri}";
-            $stats{no_journal_issn}++;
+    say " jou :\n".Dumper($journal) if $verbose;
+
+    # Ensure we have some identifier for the Journal
+    if (!$journalGCIS) {
+        if (!$journal->{print_issn}  &&  !$journal->{online_issn}) {
+            say " ERROR: no journal issn : $journal->{uri} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
+            $STATS{no_journal_issn}++;
             return 0;
         }
     }
 
-    if (%test_jou) {
-        return 0 unless $test_jou{$j->{identifier}};
-    }
-
-    if ($jg) {
-        fix_jou_issn($j, $jg);
-        my $ig = $e->diff_okay($j);
-        my $d = compare_hash($j, $jg, $ig);
-        if ($d) {
-            say " existing journal different : $j->{uri}";
-            $stats{existing_journal_different}++;
-            if (can_fix_item($d)  &&  $do_fix_items) {
-                say " can fix journal : $jg->{uri}";
-                $stats{"can_fix_journal"}++;
-                fix_item($j, $jg, $ig);
-                my $d1 = compare_hash($j, $jg, $ig);
-                !$d1 or die "didn't fix journal!";
-                update_item($g, $jg);
-                $j->{uri} = $jg->{uri};
+    # Try to Update or Add the journalling, handling Diffs as needed
+    if ($journalGCIS) {
+        fix_jou_issn($journal, $journalGCIS);
+        my $ignored = $errata->diff_okay($journal);
+        my $DIFF = compare_hash($journal, $journalGCIS, $ignored);
+        if ($DIFF) {
+            say " NOTE: existing journal different : $journal->{uri}";
+            $STATS{existing_journal_different}++;
+            if (can_fix_item($DIFF)  &&  $do_fix_items) {
+                say " NOTE: can fix journal : $journalGCIS->{uri}";
+                $STATS{"can_fix_journal"}++;
+                fix_item($journal, $journalGCIS, $ignored);
+                my $fixed_diff = compare_hash($journal, $journalGCIS, $ignored);
+                !$fixed_diff or die "didn't fix journal!";
+                update_item($gcis_handle, $journalGCIS);
+                $journal->{uri} = $journalGCIS->{uri};
             } else {
-                $diff{$j->{uri}} = $d;
+                $DIFF{$journal->{uri}} = $DIFF;
                 return 0;
             }
         } else {
-            say " existing journal same : $j->{uri}";
-            $stats{existing_journal_same}++;
+            say " NOTE: existing journal same : $journal->{uri}";
+            $STATS{existing_journal_same}++;
         }
     } elsif (!$do_not_add_journals) {
-        add_item($g, $j) or return 0;
+        add_item($gcis_handle, $journal) or return 0;
     } else {
         return 0;
     }
 
-    $a->{journal_identifier} = $j->{identifier};
-    $e->fix_errata($a);
+    # Back to Article handling - set journal on article and fix errata TODO
+    $article->{journal_identifier} = $journal->{identifier};
+    $errata->fix_errata($article);
 
-    say " art :\n".Dumper($a) if $verbose;
+    say " art :\n".Dumper($article) if $verbose;
 
+    # Assert the article matches the external
     if ($check_external) {
-        my $ig = $e->diff_okay($a);
-        $ig->{$_} = 1 for qw(uri identifier journal_identifier url);
-        my $d = compare_hash($a, $c, $ig);
-        if ($d) {
-            $diff{$a->{uri}} = $d;
-            say " external source article different : $a->{uri}";
-            $stats{external_source_article_different}++;
+        my $ignored = $errata->diff_okay($article);
+        $ignored->{$_} = 1 for qw(uri identifier journal_identifier url);
+        my $DIFF = compare_hash($article, $external_article, $ignored);
+        if ($DIFF) {
+            $DIFF{$article->{uri}} = $DIFF;
+            say " NOTE: external source article different : $article->{uri}";
+            $STATS{external_source_article_different}++;
            return 0;
         }
     }
 
-    my $ag = $g->get($a->{uri});
-    if ($ag) {
-        my $ig = $e->diff_okay($a);
-        $ig->{$_} = 1 for qw(uri author pmid);
-        my $d = compare_hash($a, $ag, $ig);
-        if ($d) {
-            say " existing article different : $a->{uri}";
-            $stats{existing_article_different}++;
+    # Handle Updating or Adding the article
+    my $articleGCIS = $gcis_handle->get($article->{uri});
+    if ($articleGCIS) {
+        my $ignored = $errata->diff_okay($article);
+        $ignored->{$_} = 1 for qw(uri author pmid);
+        my $DIFF = compare_hash($article, $articleGCIS, $ignored);
+        if ($DIFF) {
+            say " NOTE: existing article different : $article->{uri}";
+            $STATS{existing_article_different}++;
             return 0;
-            if (can_fix_item($d)  &&  $do_fix_items) {
-                say " can fix article : $ag->{uri}";
-                $stats{"can_fix_article"}++;
-                fix_item($a, $ag, $ig);
-                my $d1 = compare_hash($a, $ag, $ig);
-                !$d1 or die "didn't fix article!";
-                update_item($g, $ag);
-                $a->{uri} = $ag->{uri};
+            if (can_fix_item($DIFF)  &&  $do_fix_items) {
+                say " NOTE: can fix article : $articleGCIS->{uri}";
+                $STATS{"can_fix_article"}++;
+                fix_item($article, $articleGCIS, $ignored);
+                my $fixed_diff = compare_hash($article, $articleGCIS, $ignored);
+                !$fixed_diff or die "didn't fix article!";
+                update_item($gcis_handle, $articleGCIS);
+                $article->{uri} = $articleGCIS->{uri};
             } else {
-                $diff{$ag->{uri}} = $d;
+                $DIFF{$articleGCIS->{uri}} = $DIFF;
                 return 0;
             }
         } else {
-            say " existing article same : $a->{uri}";
-            $stats{existing_article_same}++;
+            say " NOTE: existing article same : $article->{uri}";
+            $STATS{existing_article_same}++;
         }
     } elsif (!$do_not_add_items) {
-       add_item($g, $a) or return 0;
+       add_item($gcis_handle, $article) or return 0;
     } else {
        return 0;
     }
 
-    my $b;
-    $b->{identifier} = $r->{ref_key}[0];
-    $b->{uri} = "/reference/$b->{identifier}";
-    my $ba = \%{ $b->{attrs} };
+    # Creating the Reference
+    my $article_reference;
+    $article_reference->{identifier} = $ref_handler->{ref_key}[0];
+    $article_reference->{uri} = "/reference/$article_reference->{identifier}";
+    my $reference_attrs = \%{ $article_reference->{attrs} };
 
-    map_attrs($r, $ba);
+    # clean up the attr keys
+    ## general key name mapping
+    map_attrs($ref_handler, $reference_attrs);
+
+    ## kill extraneous fields
     for ('Publication Title', 'Secondary Title', 'ISBN') {
-        next unless $ba->{$_};
-        delete $ba->{$_};
+        next unless $reference_attrs->{$_};
+        delete $reference_attrs->{$_};
     }
+
+    ## article-specific key name mapping
     my $extra_map = {
         'Date Published' => 'Date',
         'Publisher' => '.publisher',
     };
     for (keys %{ $extra_map }) {
-        next unless $ba->{$_};
-        $ba->{$extra_map->{$_}} = $ba->{$_};
-        delete $ba->{$_};
+        next unless $reference_attrs->{$_};
+        $reference_attrs->{$extra_map->{$_}} = $reference_attrs->{$_};
+        delete $reference_attrs->{$_};
     }
 
-    my $ba_map = {
+    # Overwrite these fields with the endnote values, but gcis keys
+    my $article_field_map = {
         author        => 'Author', 
         title         => 'Title', 
         url           => 'URL',
@@ -865,78 +957,83 @@ sub import_article {
         year          => 'Year', 
         pmid          => 'PMID', 
     };
-    for (keys %{ $ba_map }) {
-        my $bk = $ba_map->{$_};
-        if (!defined $a->{$_}) {
-            next unless $ba->{$bk};
-            delete $ba->{$bk};
+    foreach my $endnote_key (keys %{ $article_field_map }) {
+        my $gcis_key = $article_field_map->{$endnote_key};
+        if (!defined $article->{$endnote_key}) {
+            next unless $reference_attrs->{$gcis_key};
+            delete $reference_attrs->{$gcis_key};
             next;
         }
-        $ba->{$bk} = $a->{$_};
+        $reference_attrs->{$gcis_key} = $article->{$endnote_key};
     }
 
-    $ba->{'.reference_type'} = 0;
-    $ba->{ISSN} = $j->{online_issn} ? $j->{online_issn} : $j->{print_issn};
-    $ba->{Journal} = $j->{title};
+    # Add extra attrs and fix errata TODO
+    $reference_attrs->{'.reference_type'} = 0;
+    $reference_attrs->{ISSN} = $journal->{online_issn} ? $journal->{online_issn} : $journal->{print_issn};
+    $reference_attrs->{Journal} = $journal->{title};
 
-    $e->fix_errata($b);
+    $errata->fix_errata($article_reference);
 
-    say " bib :\n".Dumper($b) if $verbose;
+    say " bib :\n".Dumper($article_reference) if $verbose;
 
-    my $b1 = $g->get($b->{uri});
-    if ($b1) {
-        fix_bib_issn($ba, $b1->{attrs}, $j);
-        my $ig = $e->diff_okay($b);
-        $ig->{_record_number} = 1;
-        my $d = compare_hash($b, $b1, $ig);
-        if ($d) {
-            say " existing reference different : $b->{uri}";
-            $stats{existing_reference_different}++;
-            if (can_fix_item($d)  &&  $do_fix_items) {
-                say " can fix reference: $b->{uri}";
-                $stats{"can_fix_reference"}++;
-                fix_item($b, $b1, $ig);
-                my $d1 = compare_hash($b, $b1, $ig);
-                !$d1 or die "didn't fix reference!";
-                update_item($g, $b1);
+    # Update or Add the reference
+    # Handle the DIFF issues in the update
+    my $existing_gcis_ref = $gcis_handle->get($article_reference->{uri});
+    if ($existing_gcis_ref) {
+        fix_bib_issn($reference_attrs, $existing_gcis_ref->{attrs}, $journal);
+        my $ignored = $errata->diff_okay($article_reference);
+        $ignored->{_record_number} = 1;
+        my $difference = compare_hash($article_reference, $existing_gcis_ref, $ignored);
+        if ($difference) {
+            say " NOTE: existing reference different : $article_reference->{uri}";
+            $STATS{existing_reference_different}++;
+            if (can_fix_item($difference)  &&  $do_fix_items) {
+                say " NOTE: can fix reference: $article_reference->{uri}";
+                $STATS{"can_fix_reference"}++;
+                fix_item($article_reference, $existing_gcis_ref, $ignored);
+                my $fixed_diff = compare_hash($article_reference, $existing_gcis_ref, $ignored);
+                !$fixed_diff or die "didn't fix reference!";
+                update_item($gcis_handle, $existing_gcis_ref);
                 return 0 if $do_not_add_references  ||
-                            $b1->{child_publication};
+                            $existing_gcis_ref->{child_publication};
             } else {
-                $diff{$b->{uri}} = $d;
+                $DIFF{$article_reference->{uri}} = $difference;
                 return 0;
             }
         } else {
-            say " existing reference same : $b->{uri}";
-            $stats{existing_reference_same}++;
+            say " NOTE: existing reference same : $article_reference->{uri}";
+            $STATS{existing_reference_same}++;
             return 0 if $do_not_add_references  ||  
-                        $b1->{child_publication};
+                        $existing_gcis_ref->{child_publication};
         }
     } elsif (!$do_not_add_references) {
-        add_item($g, $b) or return 0;
+        add_item($gcis_handle, $article_reference) or return 0;
     } else {
         return 0;
     }
 
-    $b->{child_publication_uri} = $a->{uri};
-    add_child_pub($g, $b) or return 0;
+    # Connect the child publication
+    $article_reference->{child_publication_uri} = $article->{uri};
+    add_child_pub($gcis_handle, $article_reference) or return 0;
 
     return 1;
 }
 
 sub import_other {
-    my $p = shift;
+    my $import_args = shift;
 
-    my $g = $p->{gcis};
-    my $e = $p->{errata};
-    my $r = $p->{ref};
-    my $type = $p->{type};
+    my $gcis_handle = $import_args->{gcis};
+    my $errata = $import_args->{errata};
+    my $ref_handler = $import_args->{ref};
+    my $type = $import_args->{type};
 
     say " ---";
-    $stats{"n_$type"}++;
+    $STATS{"n_$type"}++;
     my $a;
-    $a->{title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
-        say " no title!";
-        $stats{no_title}++;
+
+    $a->{title} = xml_unescape(join ' ', @{ $ref_handler->{title} }) or do {
+        say " ERROR: no title! : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
+        $STATS{no_title}++;
         return 0;
     };
 
@@ -956,8 +1053,8 @@ sub import_other {
     my $at_map = $a_map->{$type} or 
         die "unknown type : $type";
     for (keys %{ $at_map }) {
-        next unless $r->{$_};
-        $a->{$at_map->{$_}} = $r->{$_}[0];
+        next unless $ref_handler->{$_};
+        $a->{$at_map->{$_}} = $ref_handler->{$_}[0];
     }
 
     if ($type eq 'webpage'  &&  $a->{access_date}) {
@@ -969,49 +1066,49 @@ sub import_other {
     }
 
     $a->{uri} = "/$type/".make_identifier($a->{title});
-    $e->fix_errata($a);
+    $errata->fix_errata($a);
 
-    my $ag = get_item($g, $type, $a);
-    $e->fix_errata($a);
+    my $ag = get_item($gcis_handle, $type, $a);
+    $errata->fix_errata($a);
 
     say " item :\n".Dumper($a) if $verbose;
 
     if ($ag) {
-        my $ig = $e->diff_okay($a);
-        $ig->{uri} = 1;
-        my $d = compare_hash($a, $ag, $ig);
+        my $ignored = $errata->diff_okay($a);
+        $ignored->{uri} = 1;
+        my $d = compare_hash($a, $ag, $ignored);
         if ($d) {
-            say " existing $type different : $ag->{uri}";
-            $stats{"existing_".$type."_different"}++;
+            say " NOTE: existing $type different : $ag->{uri}";
+            $STATS{"existing_".$type."_different"}++;
             if (can_fix_item($d)  &&  $do_fix_items) {
-                say " can fix $type : $ag->{uri}";
-                $stats{"can_fix_".$type}++;
-                fix_item($a, $ag, $ig);
-                my $d1 = compare_hash($a, $ag, $ig);
-                !$d1 or die "didn't fix $type!"; 
-                update_item($g, $ag);
+                say " NOTE: can fix $type : $ag->{uri}";
+                $STATS{"can_fix_".$type}++;
+                fix_item($a, $ag, $ignored);
+                my $fixed_diff = compare_hash($a, $ag, $ignored);
+                !$fixed_diff or die "didn't fix $type!"; 
+                update_item($gcis_handle, $ag);
                 $a->{uri} = $ag->{uri};
             } else {
-                $diff{$ag->{uri}} = $d;
+                $DIFF{$ag->{uri}} = $d;
                 return 0;
             }
         } else {
-            say " existing $type same : $ag->{uri}";
-            $stats{"existing_".$type."_same"}++;
+            say " NOTE: existing $type same : $ag->{uri}";
+            $STATS{"existing_".$type."_same"}++;
             $a->{uri} = $ag->{uri};
         }
     } elsif (!$do_not_add_items) {
-        $a->{uri} = add_item($g, $a) or return 0;
+        $a->{uri} = add_item($gcis_handle, $a) or return 0;
     } else {
        return 0;
     }
 
     my $b;
-    $b->{identifier} = $r->{ref_key}[0];
+    $b->{identifier} = $ref_handler->{ref_key}[0];
     $b->{uri} = "/reference/$b->{identifier}";
     my $ba = \%{ $b->{attrs} };
 
-    map_attrs($r, $ba);
+    map_attrs($ref_handler, $ba);
 
     $ba->{Title} = $a->{title};
 
@@ -1047,181 +1144,171 @@ sub import_other {
         $ba->{Year} =~ s/^(\d{4}).*/$1/;
     }
 
-    my %r_type = (
-       webpage => 16,
-       report => 10, 
-    );
-    $ba->{'.reference_type'} = $r_type{$type};
+    $ba->{'.reference_type'} = $REF_TYPE_NUM{$type};
 
-    $e->fix_errata($b);
+    $errata->fix_errata($b);
 
     say " bib :\n".Dumper($b) if $verbose;
 
-    my $b1 = $g->get($b->{uri});
+    my $b1 = $gcis_handle->get($b->{uri});
     if ($b1) {
-        my $ig = $e->diff_okay($b);
-        $ig->{_record_number} = 1;
-        my $d = compare_hash($b, $b1, $ig);
+        my $ignored = $errata->diff_okay($b);
+        $ignored->{_record_number} = 1;
+        my $d = compare_hash($b, $b1, $ignored);
         if ($d) {
-            say " existing reference different : $b->{uri}";
-            $stats{existing_reference_different}++;
+            say " NOTE: existing reference different : $b->{uri}";
+            $STATS{existing_reference_different}++;
             if (can_fix_item($d)  &&  $do_fix_items) {
-                say " can fix reference: $b->{uri}";
-                $stats{"can_fix_reference"}++;
-                fix_item($b, $b1, $ig);
-                my $d1 = compare_hash($b, $b1, $ig);
-                !$d1 or die "didn't fix reference!";
-                update_item($g, $b1);
+                say " NOTE: can fix reference: $b->{uri}";
+                $STATS{"can_fix_reference"}++;
+                fix_item($b, $b1, $ignored);
+                my $fixed_diff = compare_hash($b, $b1, $ignored);
+                !$fixed_diff or die "didn't fix reference!";
+                update_item($gcis_handle, $b1);
                 return 0 if $do_not_add_references  ||  
                             $b1->{child_publication};
             } else {
-                $diff{$b->{uri}} = $d;
+                $DIFF{$b->{uri}} = $d;
                 return 0;
             }
         } else {
-            say " existing reference same : $b->{uri}";
-            $stats{existing_reference_same}++;
+            say " NOTE: existing reference same : $b->{uri}";
+            $STATS{existing_reference_same}++;
             return 0 if $do_not_add_references  ||  
                         $b1->{child_publication};
         }
     } elsif (!$do_not_add_references) {
-        add_item($g, $b) or return 0;
+        add_item($gcis_handle, $b) or return 0;
     } else {
         return 0;
     }
 
     $b->{child_publication_uri} = $a->{uri};
-    add_child_pub($g, $b) or return 0;
+    add_child_pub($gcis_handle, $b) or return 0;
 
     return 1;
 }
 
-sub import_bib_only {
-    my $p = shift;
+sub assign_bib_keys_gcis_names {
+    my ( $bib_attrs, $type ) = @_;
 
-    my $g = $p->{gcis};
-    my $e = $p->{errata};
-    my $r = $p->{ref};
-    my $type = $p->{type};
+    my $bib_key_map = $BIB_TYPE_KEY_MAP->{$type};
+    foreach my $endnote_bib_key (keys %{ $bib_key_map }) {
+        # If the EN key has no GCIS equivalent, kill it from the attrs
+        if ( ! defined $bib_key_map->{$endnote_bib_key} ) {
+            next if !defined $bib_attrs->{$endnote_bib_key};
+            delete $bib_attrs->{$endnote_bib_key};
+            next;
+        }
+        # If we don't have a value in the attrs for the EN key,
+        # but have something in attrs for the gcis equivalent key,
+        # delete that gcis key from attrs
+        my $gcis_bib_key = $bib_key_map->{$endnote_bib_key};
+        if (
+             ! defined $bib_attrs->{$endnote_bib_key}
+        ) {
+            next if !defined $bib_attrs->{$gcis_bib_key};
+            delete $bib_attrs->{$gcis_bib_key};
+            next;
+        }
+        # Set the attrs gcis key to the value of the attrs EN key
+        # delete the EN key
+        $bib_attrs->{$gcis_bib_key} = $bib_attrs->{$endnote_bib_key};
+        delete $bib_attrs->{$endnote_bib_key};
+    }
 
-    say " ---";
-    $stats{"n_$type"}++;
-    my $b;
-    $b->{identifier} = $r->{ref_key}[0];
-    $b->{uri} = "/reference/$b->{identifier}";
+    return $bib_attrs;
+}
 
-    my $ba = \%{ $b->{attrs} };
+sub massage_bib_attrs {
+    my ( $ref_handler, $type ) = @_;
 
-    $ba->{Title} = xml_unescape(join ' ', @{ $r->{title} }) or do {
-        say " no title!";
-        $stats{no_title}++;
+    my $bib_attrs->{Title} = xml_unescape(join ' ', @{ $ref_handler->{title} }) or do {
+        say " ERROR: no title! : $ref_handler->{record_number}[0]"
+            . " : $ref_handler->{ref_key}[0]";
+        $STATS{no_title}++;
         return 0;
     };
+    map_attrs($ref_handler, $bib_attrs);
+    $bib_attrs = assign_bib_keys_gcis_names( $bib_attrs, $type );
+    $bib_attrs->{'.reference_type'} = $REF_TYPE_NUM{$type};
 
-    map_attrs($r, $ba);
-
-    my $ba_map = {
-        article => {
-            'Date Published' => 'Date',
-            'Publisher' => '.publisher',
-            'Publication Title' => undef,
-            'Secondary Title' => 'Journal', 
-            'ISBN' => undef, 
-        },
-        book => {
-            'Issue' => 'Edition', 
-            'Pages' => 'Number of Pages',
-            'Secondary Author' => 'Editor', 
-        },
-        book_section => {
-            'Secondary Title' => 'Book Title', 
-            'Issue' => 'Edition',
-            'Secondary Author' => 'Editor',
-        },
-        generic_legal => {
-        },
-        generic_press => {
-        },
-        generic_media => {
-            'Secondary Title' => 'Periodical Title', 
-            'Date' => 'E-Pub Date', 
-        },
-        generic_cpaper => {
-            'Place Published' => 'Conference Location', 
-            'Secondary Title' => 'Conference Name', 
-            'Year' => 'Year of Conference',
-        },
-        report => {
-            'Issue' => 'Number', 
-        },
-        webpage => {
-            'Issue' => 'Number', 
-        },
-    };
-
-    my $bat_map = $ba_map->{$type};
-    for (keys %{ $bat_map }) {
-        if (!defined $bat_map->{$_}) {
-            next unless defined $ba->{$_};
-            delete $ba->{$_};
-            next;
-        }
-        my $bk = $bat_map->{$_};
-        if (!defined $ba->{$_}) {
-            next unless defined $ba->{$bk};
-            delete $ba->{$bk};
-            next;
-        }
-        $ba->{$bk} = $ba->{$_};
-        delete $ba->{$_};
-    }
-
-    my %r_type = (
-       article => 0,
-       book => 9, 
-       book_section => 7, 
-       generic_legal => 32, 
-       generic_press => 63,  
-       generic_media => 48, 
-       generic_cpaper => 47, 
-       report => 10, 
-       webpage => 16,
-    );
-    $ba->{'.reference_type'} = $r_type{$type};
-
-    $e->fix_errata($b);
-
-    say " bib :\n".Dumper($b) if $verbose;
-
-    my $b1 = $g->get($b->{uri});
-    if ($b1) {
-        my $ig = $e->diff_okay($b);
-        $ig->{_record_number} = 1;
-        my $d = compare_hash($b, $b1, $ig);
-        if ($d) {
-            say " existing reference different : $b->{uri}";
-            $stats{existing_reference_different}++;
-            if (can_fix_item($d)  &&  $do_fix_items) {
-                say " can fix reference: $b->{uri}";
-                $stats{"can_fix_reference"}++;
-                fix_item($b, $b1, $ig);
-                my $d1 = compare_hash($b, $b1, $ig);
-                !$d1 or die "didn't fix reference!";
-                update_item($g, $b1);
-            } else {
-                $diff{$b->{uri}} = $d;
-                return 0;
-            }
-        } else {
-            say " existing reference same : $b->{uri}";
-            $stats{existing_reference_same}++;
-        }
-    } elsif (!$do_not_add_references) {
-        add_item($g, $b);
-    }
-
-    return 1;
+    return $bib_attrs;
 }
+
+# TODO
+# TODO break this up with aggression
+
+sub create_bib {
+    my $import_args = shift;
+    my $gcis_handle = $import_args->{gcis};
+    my $errata = $import_args->{errata};
+    my $ref_handler = $import_args->{ref};
+    my $type = $import_args->{type};
+
+    say " ---";
+    $STATS{"n_$type"}++;
+
+    my $bib;
+    $bib->{identifier} = $ref_handler->{ref_key}[0];
+    $bib->{uri} = "/reference/$bib->{identifier}";
+
+    $bib->{attrs} = massage_bib_attrs( $ref_handler, $type );
+
+    $errata->fix_errata($bib);
+
+    say " bib :\n".Dumper($bib) if $verbose;
+
+    return $bib;
+}
+
+sub update_existing_bib {
+    my ($import_args, $bib_existing) = shift;
+    my $gcis_handle = $import_args->{gcis};
+    my $errata      = $import_args->{errata};
+    my $bib         = $import_args->{bib};
+
+    my $ignored = $errata->diff_okay($bib);
+    $ignored->{_record_number} = 1;
+    my $difference = compare_hash($bib, $bib_existing, $ignored);
+    if ($difference) {
+        say " NOTE: existing reference different : $bib->{uri}";
+        $STATS{existing_reference_different}++;
+        if (can_fix_item($difference)  &&  $do_fix_items) {
+            say " NOTE: can fix reference: $bib->{uri}";
+            $STATS{"can_fix_reference"}++;
+            fix_item($bib, $bib_existing, $ignored);
+            my $fixed_diff = compare_hash($bib, $bib_existing, $ignored);
+            !$fixed_diff or die "didn't fix reference!";
+            update_item($gcis_handle, $bib_existing);
+        } else {
+            $DIFF{$bib->{uri}} = $difference;
+            return 0;
+        }
+    } else {
+        say " NOTE: existing reference same : $bib->{uri}";
+        $STATS{existing_reference_same}++;
+    }
+    return;
+}
+
+sub import_bib {
+    my $import_args = shift;
+    my $gcis_handle = $import_args->{gcis};
+    my $bib         = $import_args->{bib};
+
+    my $bib_existing = $gcis_handle->get($bib->{uri});
+    if ($bib_existing) {
+        update_existing_bib($import_args, $bib_existing);
+    } elsif (!$do_not_add_references) {
+        add_item($gcis_handle, $bib);
+    }
+
+    return $bib;
+}
+
+# Utility Function to format the DIFF...
+# TODO why?
 
 sub format_diff {
     my ($k, $d) = @_;
@@ -1238,126 +1325,140 @@ sub format_diff {
     return $e;
 }
 
+# Utility Function Given a DIFF filename, dump the DIFF out to it
+
 sub dump_diff {
 
-    my $n_diff = keys %diff;
+    my $n_diff = keys %DIFF;
     return 1 if $n_diff == 0  ||  !$diff_file;
 
     my $y;
-    for my $k (sort keys %diff) {
+    for my $k (sort keys %DIFF) {
         my $v;
         $v->{uri} = $k;
-        for (sort keys %{ $diff{$k} }) {
-            my $d = $diff{$k}->{$_};
+        for (sort keys %{ $DIFF{$k} }) {
+            my $d = $DIFF{$k}->{$_};
             push @{ $v->{errata} }, format_diff($_, $d);
         }
         push @{ $y }, $v;
     }
 
-    open my $f, '>:encoding(UTF-8)', $diff_file or die "can't open diff file";
+    open my $f, '>:encoding(UTF-8)', $diff_file or die "can't open DIFF file";
     say $f Dump($y);
     close $f;
 
     return 1;
 }
 
+# Utility Function Given a file containing alternate IDs, load the YAML file into perl
+
 sub load_alt_ids {
     return undef unless $alt_id_file;
-    open my $f, '<:encoding(UTF-8)', $alt_id_file or 
+    open my $file_handle, '<:encoding(UTF-8)', $alt_id_file or 
        die "can't open alternate id file";
-    my $yml = do { local $/; <$f> };
-    close $f;
+    my $yml = do { local $/; <$file_handle> };
+    close $file_handle;
 
-    my $y = Load($yml);
-    my $a;
-    for (@{ $y }) {
-       my $k = $_->{url} or next;
-       $a->{$k} = $_->{id} or next;
+    my $yaml_content = Load($yml);
+    my $alt_id;
+    for (@{ $yaml_content }) {
+       my $key = $_->{url} or next;
+       $alt_id->{$key} = $_->{id} or next;
     }
-    return $a ? $a : undef;
+    return $alt_id ? $alt_id : undef;
 }
 
-sub main {
-    my %p;
-    $p{gcis} = $dry_run ? Gcis::Client->new(url => $url)
-                        : Gcis::Client->connect(url => $url);
-    $p{errata} = Errata->load($errata_file);
+# Prints out our initial refs info
 
-    my $r = Refs->new;
-    $r->{n_max} = $max_references;
-    $r->load($endnote_file);
-    $p{alt_ids} = load_alt_ids($alt_id_file);
-    my $n = $r->type_counts;
+sub report_initial_state {
+    my ($n) = @_;
+
+    # Report Options Settings
+    say " importing endnote references";
+    say "   url : $url";
+    say "   endnote_file : $endnote_file";
+    say "   max_updates : $max_updates";
+    say "   max_references : $max_references";
+    say "   do_not_add_journals" if $do_not_add_journals;
+    say "   do_not_add_items" if $do_not_add_items;
+    say "   do_not_add_referneces" if $do_not_add_references;
+    say "   errata_file : $errata_file" if $errata_file;
+    say "   diff_file : $diff_file" if $diff_file;
+    say "   alt_id_file : $alt_id_file" if $alt_id_file;
+    say "   verbose" if $verbose;
+    say "   dry_run" if $dry_run;
+    say '';
+
+    # Report Type Counts
     say " endnote entries : ";
     my $n_tot = 0;
     for (keys %{ $n }) {
         say "   $_ : $n->{$_}";
         $n_tot += $n->{$_};
     }
-    say "   total : $n_tot";
-    say "";
+    say "   total : $n_tot\n";
 
-    my %map = (
-       'Book' => 'book',
-       'Edited Book' => 'book',
-       'Electronic Book' => 'book',
-       'Book Section' => 'book_section', 
-       'Electronic Book Section' => 'book_section',
-       'Report' => 'report',
-       'Manuscript' => 'report',
-       'Journal Article' => 'article',
-       'Web Page' => 'webpage',
-       'Dataset' => 'dataset',
-       'Conference Paper' => 'generic_cpaper', 
-       'Online Multimedia' => 'generic_media',
-       'Legal Rule or Regulation' => 'generic_legal', 
-       'Press Release' => 'generic_press', 
-       'Aggregated Database' => 'generic_aggregateDB',
-    );
-    my @which = qw(article report webpage);
-    my $bib_only = 1;
-    my $do_all = 1;
-    for (@{ $r->{records} }) {
-        $p{ref} = $_;
-        $p{type} = $map{$_->{reftype}[0]} or 
-            die " type not known : $_->{reftype}[0]";
-        next unless $do_all || (grep $p{type} eq $_, @which);
-                    
+    return;
+}
 
-        my $do_it = 1;
-        if (keys %test) {
-            $do_it = 0;
-            for (keys %test) {
-                my $t = $test{$_};
-                next unless $p{ref}->{$t}[0];
-                next unless $p{ref}->{$t}[0] eq $_;
-                $do_it = 1;
-                last;
-            }
-        }
-        next unless $do_it;
+sub report_final_state {
 
-        if ($p{type} eq 'article'  &&  !$bib_only) {
-            import_article(\%p);
-        } elsif ((grep $p{type} eq $_, qw(webpage report))  && !$bib_only) {
-            import_other(\%p);
-        } else {
-            import_bib_only(\%p);
-        }
-        last if $max_updates > 0  &&  $n_updates >= $max_updates;
-    }
-    dump_diff;
-
-    my $n_diff = keys %diff;
-    say '';
-    say " n diff : $n_diff";
+    my $n_diff = keys %DIFF;
+    say "\n n DIFF : $n_diff";
 
     my $n_stat = 0;
-    for (sort keys %stats) {
-        say "   $_ : $stats{$_}";
-        $n_stat += $stats{$_};
+    for (sort keys %STATS) {
+        say "   $_ : $STATS{$_}";
+        $n_stat += $STATS{$_};
     }
     say " n stat : $n_stat";
+
+    return;
+}
+
+sub main {
+    my %import_args;
+    $import_args{gcis} = $dry_run ? Gcis::Client->new(url => $url)
+                        : Gcis::Client->connect(url => $url);
+    $import_args{errata} = Errata->load($errata_file);
+
+    my $ref_handler = Refs->new;
+    $ref_handler->{n_max} = $max_references;
+    $ref_handler->load($endnote_file);
+    $import_args{alt_ids} = load_alt_ids($alt_id_file);
+
+    # Internal config switches
+    my $bib_only = 0;
+    my $do_all_types = 1;
+
+    report_initial_state($ref_handler->type_counts);
+
+    my @types_to_process = qw(article report webpage);
+    foreach my $record (@{ $ref_handler->{records} }) {
+        $import_args{ref} = $record;
+        $import_args{type} = $TYPE_MAP{$record->{reftype}[0]} or 
+            die " type not known : $record->{reftype}[0]";
+        next unless $do_all_types || (grep $import_args{type} eq $record, @types_to_process);
+
+        # Create bib entry
+        $import_args{bib} = create_bib( \%import_args );
+        import_bib( \%import_args );
+        #import_bib_only(\%import_args);
+        # if ( ! $bib_only )
+        # If not $bib_only
+        # Create pub entry
+        # import pub (create/update)
+        #elsif ($import_args{type} eq 'article'  &&  !$bib_only) {
+        #    import_article(\%import_args);
+        #} elsif ((grep $import_args{type} eq $record, qw(webpage report))  && !$bib_only) {
+        #    import_other(\%import_args);
+        #}
+
+        last if $max_updates > 0  &&  $N_UPDATES >= $max_updates;
+    }
+
+    dump_diff;
+    report_final_state;
 
     return;
 }
