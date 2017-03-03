@@ -737,6 +737,84 @@ sub map_attrs {
     return 1;
 }
 
+sub import_journal_from_article {
+    my %args = @_;
+
+    $ref_handler      => $args{ref_handler};
+    $article          => $args{article};
+    $external_article => $args{external_article};
+    $gcis_handle      => $args{gcis_handle};
+    $errata           => $args{errata};
+
+    # Build the Journal Resource
+    my $journal;
+    $journal->{title} = xml_unescape($ref_handler->{secondary_title}[0]) or do {
+        say " ERROR: no journal title : $article->{identifier} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
+        $STATS{no_journal_title}++;
+        return 0;
+    };
+
+    $journal->{print_issn} = $external_article->{issn}[0];
+    $journal->{online_issn} = $external_article->{issn}[1];
+    $journal->{publisher} = $external_article->{publisher};
+
+    # Pull any matching existing GCIS Journal
+    my $journalGCIS = get_item($gcis_handle, 'journal', $journal);
+
+    # Apply errata? TODO 
+    $errata->fix_errata($journal);
+
+    say " jou :\n".Dumper($journal) if $verbose;
+
+    # Ensure _keywe have some identifier for the Journal
+    if (!$journalGCIS) {
+        if (!$journal->{print_issn}  &&  !$journal->{online_issn}) {
+            say " ERROR: no journal issn : $journal->{uri} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
+            $STATS{no_journal_issn}++;
+            return 0;
+        }
+    }
+
+    # Try to Update or Add the journalling, handling Diffs as needed
+    #return add_or_update_resource(
+    #new_resource 
+    #existing_gcis_resource
+    #errata
+    #gcis_handle
+    #);
+
+    if ($journalGCIS) {
+        fix_jou_issn($journal, $journalGCIS);
+        my $ignored = $errata->diff_okay($journal);
+        my $DIFF = compare_hash($journal, $journalGCIS, $ignored);
+        if ($DIFF) {
+            say " NOTE: existing journal different : $journal->{uri}";
+            $STATS{existing_journal_different}++;
+            if (can_fix_item($DIFF)  &&  $do_fix_items) {
+                say " NOTE: can fix journal : $journalGCIS->{uri}";
+                $STATS{"can_fix_journal"}++;
+                fix_item($journal, $journalGCIS, $ignored);
+                my $fixed_diff = compare_hash($journal, $journalGCIS, $ignored);
+                !$fixed_diff or die "didn't fix journal!";
+                update_item($gcis_handle, $journalGCIS);
+                $journal->{uri} = $journalGCIS->{uri};
+            } else {
+                $DIFF{$journal->{uri}} = $DIFF;
+                return 0;
+            }
+        } else {
+            say " NOTE: existing journal same : $journal->{uri}";
+            $STATS{existing_journal_same}++;
+        }
+    } elsif (!$DO_NOT_ADD{ journal } ) {
+        add_item($gcis_handle, $journal) or return 0;
+    } else {
+        return 0;
+    }
+
+    return $journal->{identifier};
+}
+
 sub import_article {
     my $import_args = shift;
 
@@ -818,67 +896,16 @@ sub import_article {
 
     $article->{uri} = "/article/$article->{identifier}";
 
-    # Build the Journal Resource
-    my $journal;
-    $journal->{title} = xml_unescape($ref_handler->{secondary_title}[0]) or do {
-        say " ERROR: no journal title : $article->{identifier} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
-        $STATS{no_journal_title}++;
-        return 0;
-    };
-
-    $journal->{print_issn} = $external_article->{issn}[0];
-    $journal->{online_issn} = $external_article->{issn}[1];
-    $journal->{publisher} = $external_article->{publisher};
-
-    # Pull any matching existing GCIS Journal
-    my $journalGCIS = get_item($gcis_handle, 'journal', $journal);
-
-    # Apply errata? TODO 
-    $errata->fix_errata($journal);
-
-    say " jou :\n".Dumper($journal) if $verbose;
-
-    # Ensure we have some identifier for the Journal
-    if (!$journalGCIS) {
-        if (!$journal->{print_issn}  &&  !$journal->{online_issn}) {
-            say " ERROR: no journal issn : $journal->{uri} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
-            $STATS{no_journal_issn}++;
-            return 0;
-        }
-    }
-
-    # Try to Update or Add the journalling, handling Diffs as needed
-    if ($journalGCIS) {
-        fix_jou_issn($journal, $journalGCIS);
-        my $ignored = $errata->diff_okay($journal);
-        my $DIFF = compare_hash($journal, $journalGCIS, $ignored);
-        if ($DIFF) {
-            say " NOTE: existing journal different : $journal->{uri}";
-            $STATS{existing_journal_different}++;
-            if (can_fix_item($DIFF)  &&  $do_fix_items) {
-                say " NOTE: can fix journal : $journalGCIS->{uri}";
-                $STATS{"can_fix_journal"}++;
-                fix_item($journal, $journalGCIS, $ignored);
-                my $fixed_diff = compare_hash($journal, $journalGCIS, $ignored);
-                !$fixed_diff or die "didn't fix journal!";
-                update_item($gcis_handle, $journalGCIS);
-                $journal->{uri} = $journalGCIS->{uri};
-            } else {
-                $DIFF{$journal->{uri}} = $DIFF;
-                return 0;
-            }
-        } else {
-            say " NOTE: existing journal same : $journal->{uri}";
-            $STATS{existing_journal_same}++;
-        }
-    } elsif (!$do_not_add_journals) {
-        add_item($gcis_handle, $journal) or return 0;
-    } else {
-        return 0;
-    }
+    my $journal_identifier = import_journal_from_article( 
+        ref_handler      => $ref_handler,
+        article          => $article,
+        external_article => $external_article,
+        gcis_handle      => $gcis_handle,
+        errata           => $errata,
+    );
 
     # Back to Article handling - set journal on article and fix errata TODO
-    $article->{journal_identifier} = $journal->{identifier};
+    $article->{journal_identifier} = $journal_identifier;
     $errata->fix_errata($article);
 
     say " art :\n".Dumper($article) if $verbose;
