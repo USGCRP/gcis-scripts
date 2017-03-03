@@ -775,44 +775,62 @@ sub import_journal_from_article {
         }
     }
 
-    # Try to Update or Add the journalling, handling Diffs as needed
-    #return add_or_update_resource(
-    #new_resource 
-    #existing_gcis_resource
-    #errata
-    #gcis_handle
-    #);
+    fix_jou_issn($journal, $journalGCIS) if $journalGCIS;
 
     if ($journalGCIS) {
-        fix_jou_issn($journal, $journalGCIS);
-        my $ignored = $errata->diff_okay($journal);
-        my $DIFF = compare_hash($journal, $journalGCIS, $ignored);
-        if ($DIFF) {
-            say " NOTE: existing journal different : $journal->{uri}";
-            $STATS{existing_journal_different}++;
-            if (can_fix_item($DIFF)  &&  $do_fix_items) {
-                say " NOTE: can fix journal : $journalGCIS->{uri}";
-                $STATS{"can_fix_journal"}++;
-                fix_item($journal, $journalGCIS, $ignored);
-                my $fixed_diff = compare_hash($journal, $journalGCIS, $ignored);
-                !$fixed_diff or die "didn't fix journal!";
-                update_item($gcis_handle, $journalGCIS);
-                $journal->{uri} = $journalGCIS->{uri};
-            } else {
-                $DIFF{$journal->{uri}} = $DIFF;
-                return 0;
-            }
-        } else {
-            say " NOTE: existing journal same : $journal->{uri}";
-            $STATS{existing_journal_same}++;
-        }
+        update_existing_resource(
+          existing    => $journalGCIS,
+          new         => $journal,
+          errata      => $errata,
+          gcis_handle => $gcis_handle,
+          type        => 'journal',
+        );
     } elsif (!$DO_NOT_ADD{ journal } ) {
-        add_item($gcis_handle, $journal) or return 0;
+        $journal->{uri} = add_item($gcis_handle, $journal) or return 0;
     } else {
         return 0;
     }
 
     return $journal->{identifier};
+}
+
+sub update_existing_resource {
+    my %args = @_;
+
+    my $existing_resource = $args{existing};
+    my $new_resource      = $args{new};
+    my $errata            = $args{errata};
+    my $gcis_handle       = $args{gcis_handle};
+    my $resource_type     = $args{type};
+
+    my $ignored = $errata->diff_okay($new_resource);
+    if ( $resource_type eq 'article' ) {
+        $ignored->{$_} = 1 for qw(uri author pmid);
+    }
+    elsif ( $resource_type eq 'webpage' || $resource_type eq 'report' ) {
+        $ignored->{uri} = 1;
+    }
+    my $DIFF = compare_hash($new_resource, $existing_resource, $ignored);
+    if ($DIFF) {
+        say " NOTE: existing $resource_type different : $new_resource->{uri}";
+        $STATS{existing_".$resource_type."_different}++;
+        if (can_fix_item($DIFF)  &&  $do_fix_items) {
+            say " NOTE: can fix $resource_type : $existing_resource->{uri}";
+            $STATS{"can_fix_".$resource_type}++;
+            fix_item($new_resource, $existing_resource, $ignored);
+            my $fixed_diff = compare_hash($new_resource, $existing_resource, $ignored);
+            !$fixed_diff or die "didn't fix $resource_type!";
+            update_item($gcis_handle, $new_resource);
+            $new_resource->{uri} = $existing_resource->{uri};
+        } else {
+            $DIFF{$new_resource->{uri}} = $DIFF;
+            return 0;
+        }
+    } else {
+        say " NOTE: existing $resource_type same : $new_resource->{uri}";
+        $STATS{existing_".$resource_type."_same}++;
+        $new_resource->{uri} = $existing_resource->{uri};
+    }
 }
 
 sub import_article {
@@ -926,29 +944,13 @@ sub import_article {
     # Handle Updating or Adding the article
     my $articleGCIS = $gcis_handle->get($article->{uri});
     if ($articleGCIS) {
-        my $ignored = $errata->diff_okay($article);
-        $ignored->{$_} = 1 for qw(uri author pmid);
-        my $DIFF = compare_hash($article, $articleGCIS, $ignored);
-        if ($DIFF) {
-            say " NOTE: existing article different : $article->{uri}";
-            $STATS{existing_article_different}++;
-            return 0;
-            if (can_fix_item($DIFF)  &&  $do_fix_items) {
-                say " NOTE: can fix article : $articleGCIS->{uri}";
-                $STATS{"can_fix_article"}++;
-                fix_item($article, $articleGCIS, $ignored);
-                my $fixed_diff = compare_hash($article, $articleGCIS, $ignored);
-                !$fixed_diff or die "didn't fix article!";
-                update_item($gcis_handle, $articleGCIS);
-                $article->{uri} = $articleGCIS->{uri};
-            } else {
-                $DIFF{$articleGCIS->{uri}} = $DIFF;
-                return 0;
-            }
-        } else {
-            say " NOTE: existing article same : $article->{uri}";
-            $STATS{existing_article_same}++;
-        }
+        update_existing_resource(
+          existing    => $articleGCIS,
+          new         => $article,
+          errata      => $errata,
+          gcis_handle => $gcis_handle,
+          type        => 'article',
+        );
     } elsif (!$DO_NOT_ADD{article} ) {
        add_item($gcis_handle, $article) or return 0;
     } else {
@@ -1115,29 +1117,13 @@ sub import_other {
     say " item :\n".Dumper($resource) if $verbose;
     ## NOTE
     if ($resource_in_gcis) {
-        my $ignored = $errata->diff_okay($resource);
-        $ignored->{uri} = 1;
-        my $res_diff = compare_hash($resource, $resource_in_gcis, $ignored);
-        if ($res_diff) {
-            say " NOTE: existing $type different : $resource_in_gcis->{uri}";
-            $STATS{"existing_".$type."_different"}++;
-            if (can_fix_item($res_diff)  &&  $do_fix_items) {
-                say " NOTE: can fix $type : $resource_in_gcis->{uri}";
-                $STATS{"can_fix_".$type}++;
-                fix_item($resource, $resource_in_gcis, $ignored);
-                my $fixed_diff = compare_hash($resource, $resource_in_gcis, $ignored);
-                !$fixed_diff or die "didn't fix $type!"; 
-                update_item($gcis_handle, $resource_in_gcis);
-                $resource->{uri} = $resource_in_gcis->{uri};
-            } else {
-                $DIFF{$resource_in_gcis->{uri}} = $res_diff;
-                return 0;
-            }
-        } else {
-            say " NOTE: existing $type same : $resource_in_gcis->{uri}";
-            $STATS{"existing_".$type."_same"}++;
-            $resource->{uri} = $resource_in_gcis->{uri};
-        }
+        update_existing_resource(
+          existing    => $resource,
+          new         => $resource_in_gcis,
+          errata      => $errata,
+          gcis_handle => $gcis_handle,
+          type        => $type,
+        );
     } elsif (!$DO_NOT_ADD{ $type }) {
         $resource->{uri} = add_item($gcis_handle, $resource) or return 0;
     } else {
