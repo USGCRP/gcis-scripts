@@ -176,6 +176,15 @@ pod2usage(msg => "missing url or endnote file", verbose => 1) unless ($url && $e
 
 ## Data Maps
 
+my %DO_NOT_ADD = (
+    journals   = $do_not_add_journals ? 1 : 0;
+    references = $do_not_add_references ? 1 : 0;
+    report     = $do_not_add_items ? 1 : 0;
+    webpage    = $do_not_add_items ? 1 : 0;
+    article    = $do_not_add_items ? 1 : 0;
+    journal    = $do_not_add_items ? 1 : 0;
+);
+
 my %TYPE_MAP = (
    'Book' => 'book',
    'Edited Book' => 'book',
@@ -913,7 +922,7 @@ sub import_article {
             say " NOTE: existing article same : $article->{uri}";
             $STATS{existing_article_same}++;
         }
-    } elsif (!$do_not_add_items) {
+    } elsif (!$DO_NOT_ADD{article} ) {
        add_item($gcis_handle, $article) or return 0;
     } else {
        return 0;
@@ -994,7 +1003,7 @@ sub import_article {
                 my $fixed_diff = compare_hash($article_reference, $existing_gcis_ref, $ignored);
                 !$fixed_diff or die "didn't fix reference!";
                 update_item($gcis_handle, $existing_gcis_ref);
-                return 0 if $do_not_add_references  ||
+                return 0 if $DO_NOT_ADD{ references }  ||
                             $existing_gcis_ref->{child_publication};
             } else {
                 $DIFF{$article_reference->{uri}} = $difference;
@@ -1003,10 +1012,10 @@ sub import_article {
         } else {
             say " NOTE: existing reference same : $article_reference->{uri}";
             $STATS{existing_reference_same}++;
-            return 0 if $do_not_add_references  ||  
+            return 0 if $DO_NOT_ADD{ references }  ||  
                         $existing_gcis_ref->{child_publication};
         }
-    } elsif (!$do_not_add_references) {
+    } elsif (!$DO_NOT_ADD{ references }) {
         add_item($gcis_handle, $article_reference) or return 0;
     } else {
         return 0;
@@ -1102,8 +1111,8 @@ sub import_other {
             $STATS{"existing_".$type."_same"}++;
             $resource->{uri} = $resource_in_gcis->{uri};
         }
-    } elsif (!$do_not_add_items) {
-        $a->{uri} = add_item($gcis_handle, $a) or return 0;
+    } elsif (!$DO_NOT_ADD{ $type }) {
+        $resource->{uri} = add_item($gcis_handle, $resource) or return 0;
     } else {
        return 0;
     }
@@ -1171,7 +1180,7 @@ sub import_other {
                 my $fixed_diff = compare_hash($resource_reference, $existing_gcis_ref, $ignored);
                 !$fixed_diff or die "didn't fix reference!";
                 update_item($gcis_handle, $existing_gcis_ref);
-                return 0 if $do_not_add_references  ||  
+                return 0 if $DO_NOT_ADD{ references }  ||  
                             $existing_gcis_ref->{child_publication};
             } else {
                 $DIFF{$resource_reference->{uri}} = $difference;
@@ -1180,10 +1189,10 @@ sub import_other {
         } else {
             say " NOTE: existing reference same : $resource_reference->{uri}";
             $STATS{existing_reference_same}++;
-            return 0 if $do_not_add_references  ||  
+            return 0 if $DO_NOT_ADD{ references }  ||  
                         $existing_gcis_ref->{child_publication};
         }
-    } elsif (!$do_not_add_references) {
+    } elsif (!$DO_NOT_ADD{ references }) {
         add_item($gcis_handle, $resource_reference) or return 0;
     } else {
         return 0;
@@ -1316,7 +1325,7 @@ sub import_bib {
     my $bib_existing = $gcis_handle->get($bib->{uri});
     if ($bib_existing) {
         update_existing_bib($import_args, $bib_existing);
-    } elsif (!$do_not_add_references) {
+    } elsif (!$DO_NOT_ADD{ references }) {
         add_item($gcis_handle, $bib);
     }
 
