@@ -69,7 +69,7 @@ Flag indicating journals are not to be added
 
 =item B<--do_not_add_items>
 
-Flag indicating items (articles, web pages, etc.) are not to be added
+Flag indicating items (articles, web pages, etc.) are not to be added. Does not cover journals
 
 =item B<--do_not_add_references>
 
@@ -750,16 +750,16 @@ sub import_article {
         s/\(\s+/\(/g;  s/\s+\)/\)/g;
     }
 
-    my $article_map = {
+    my $article_key_map = {
         urls   => 'url',
         doi    => 'doi', 
         year   => 'year',
         volume => 'journal_vol',
         pages  => 'journal_pages',
     };
-    for (keys %{ $article_map }) {
+    for (keys %{ $article_key_map }) {
         next unless $ref_handler->{$_};
-        $article->{$article_map->{$_}} = $ref_handler->{$_}[0];
+        $article->{$article_key_map->{$_}} = $ref_handler->{$_}[0];
     }
     $article->{author} = xml_unescape(join '; ', @{ $ref_handler->{author} });
 
@@ -1026,18 +1026,20 @@ sub import_other {
     my $errata = $import_args->{errata};
     my $ref_handler = $import_args->{ref};
     my $type = $import_args->{type};
+    my $resource;
 
     say " ---";
     $STATS{"n_$type"}++;
-    my $a;
 
-    $a->{title} = xml_unescape(join ' ', @{ $ref_handler->{title} }) or do {
+    # Pull information out of the EndNote reference
+    # to build the Resource
+    $resource->{title} = xml_unescape(join ' ', @{ $ref_handler->{title} }) or do {
         say " ERROR: no title! : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
         $STATS{no_title}++;
         return 0;
     };
 
-    my $a_map = {
+    my $resource_key_map = {
         webpage => {
             urls => 'url', 
             year => 'access_date',
@@ -1050,52 +1052,55 @@ sub import_other {
         },
     };
 
-    my $at_map = $a_map->{$type} or 
+    my $this_resource_key_map = $resource_key_map->{$type} or 
         die "unknown type : $type";
-    for (keys %{ $at_map }) {
+    for (keys %{ $this_resource_key_map }) {
         next unless $ref_handler->{$_};
-        $a->{$at_map->{$_}} = $ref_handler->{$_}[0];
+        $resource->{$this_resource_key_map->{$_}} = $ref_handler->{$_}[0];
     }
 
-    if ($type eq 'webpage'  &&  $a->{access_date}) {
-       delete $a->{access_date} if $a->{access_date} eq 'Undated';
-       $a->{access_date} .= "-01-01T00:00:00" if $a->{access_date};
+    if ($type eq 'webpage'  &&  $resource->{access_date}) {
+       delete $resource->{access_date} if $resource->{access_date} eq 'Undated';
+       $resource->{access_date} .= "-01-01T00:00:00" if $resource->{access_date};
     }
-    if ($type eq 'report'  &&  $a->{publication_year}) {
-       delete $a->{publication_year} if $a->{publication_year} eq 'n.d.';
+    if ($type eq 'report'  &&  $resource->{publication_year}) {
+       delete $resource->{publication_year} if $resource->{publication_year} eq 'n.d.';
     }
 
-    $a->{uri} = "/$type/".make_identifier($a->{title});
-    $errata->fix_errata($a);
+    $resource->{uri} = "/$type/".make_identifier($resource->{title});
+    $errata->fix_errata($resource);
 
-    my $ag = get_item($gcis_handle, $type, $a);
-    $errata->fix_errata($a);
+    # Try to load any existing version of resource from GCIS
+    my $resource_in_gcis = get_item($gcis_handle, $type, $resource);
 
-    say " item :\n".Dumper($a) if $verbose;
+    # Apply any errata to the resource
+    $errata->fix_errata($resource);
 
-    if ($ag) {
-        my $ignored = $errata->diff_okay($a);
+    say " item :\n".Dumper($resource) if $verbose;
+    ## NOTE
+    if ($resource_in_gcis) {
+        my $ignored = $errata->diff_okay($resource);
         $ignored->{uri} = 1;
-        my $d = compare_hash($a, $ag, $ignored);
-        if ($d) {
-            say " NOTE: existing $type different : $ag->{uri}";
+        my $res_diff = compare_hash($resource, $resource_in_gcis, $ignored);
+        if ($res_diff) {
+            say " NOTE: existing $type different : $resource_in_gcis->{uri}";
             $STATS{"existing_".$type."_different"}++;
-            if (can_fix_item($d)  &&  $do_fix_items) {
-                say " NOTE: can fix $type : $ag->{uri}";
+            if (can_fix_item($res_diff)  &&  $do_fix_items) {
+                say " NOTE: can fix $type : $resource_in_gcis->{uri}";
                 $STATS{"can_fix_".$type}++;
-                fix_item($a, $ag, $ignored);
-                my $fixed_diff = compare_hash($a, $ag, $ignored);
+                fix_item($resource, $resource_in_gcis, $ignored);
+                my $fixed_diff = compare_hash($resource, $resource_in_gcis, $ignored);
                 !$fixed_diff or die "didn't fix $type!"; 
-                update_item($gcis_handle, $ag);
-                $a->{uri} = $ag->{uri};
+                update_item($gcis_handle, $resource_in_gcis);
+                $resource->{uri} = $resource_in_gcis->{uri};
             } else {
-                $DIFF{$ag->{uri}} = $d;
+                $DIFF{$resource_in_gcis->{uri}} = $res_diff;
                 return 0;
             }
         } else {
-            say " NOTE: existing $type same : $ag->{uri}";
+            say " NOTE: existing $type same : $resource_in_gcis->{uri}";
             $STATS{"existing_".$type."_same"}++;
-            $a->{uri} = $ag->{uri};
+            $resource->{uri} = $resource_in_gcis->{uri};
         }
     } elsif (!$do_not_add_items) {
         $a->{uri} = add_item($gcis_handle, $a) or return 0;
@@ -1103,16 +1108,17 @@ sub import_other {
        return 0;
     }
 
-    my $b;
-    $b->{identifier} = $ref_handler->{ref_key}[0];
-    $b->{uri} = "/reference/$b->{identifier}";
-    my $ba = \%{ $b->{attrs} };
+    my $resource_reference;
+    $resource_reference->{identifier} = $ref_handler->{ref_key}[0];
+    $resource_reference->{uri} = "/reference/$resource_reference->{identifier}";
+    my $reference_attrs = \%{ $resource_reference->{attrs} };
 
-    map_attrs($ref_handler, $ba);
+    map_attrs($ref_handler, $reference_attrs);
 
-    $ba->{Title} = $a->{title};
+    $reference_attrs->{Title} = $resource->{title};
 
-    my $ba_map = {
+    # Overwrite these fields with the EndNote value, but use the GCIS key.
+    my $all_field_map = {
         webpage => {
             url => 'URL',
             access_date => 'Year',
@@ -1125,66 +1131,66 @@ sub import_other {
         },
     };
 
-    my $bat_map = $ba_map->{$type};
-    for (keys %{ $bat_map }) {
-        my $bk = $bat_map->{$_};
-        if (!defined $a->{$_}) {
-            next unless defined $ba->{$bk};
-            delete $ba->{$bk};
+    my $thisType_field_map = $all_field_map->{$type};
+    foreach my $endnote_key ( keys %{ $thisType_field_map }) {
+        my $gcis_key = $thisType_field_map->{$endnote_key};
+        if (!defined $resource->{$endnote_key}) {
+            next unless defined $reference_attrs->{$gcis_key};
+            delete $reference_attrs->{$gcis_key};
             next;
         }
-        $ba->{$bk} = $a->{$_};
-    }
-    if (defined $ba->{Issue}) {
-         $ba->{Number} = $ba->{Issue};
-         delete $ba->{Issue};
+        $reference_attrs->{$gcis_key} = $resource->{$endnote_key};
     }
 
-    if ($type eq 'webpage'  &&  $ba->{Year}) {
-        $ba->{Year} =~ s/^(\d{4}).*/$1/;
+    # handle extra attributes munging and fix errate (TODO what?)
+    if (defined $reference_attrs->{Issue}) {
+         $reference_attrs->{Number} = $reference_attrs->{Issue};
+         delete $reference_attrs->{Issue};
     }
+    if ($type eq 'webpage'  &&  $reference_attrs->{Year}) {
+        $reference_attrs->{Year} =~ s/^(\d{4}).*/$1/;
+    }
+    $reference_attrs->{'.reference_type'} = $REF_TYPE_NUM{$type};
 
-    $ba->{'.reference_type'} = $REF_TYPE_NUM{$type};
+    $errata->fix_errata($resource_reference);
 
-    $errata->fix_errata($b);
+    say " bib :\n".Dumper($resource_reference) if $verbose;
 
-    say " bib :\n".Dumper($b) if $verbose;
-
-    my $b1 = $gcis_handle->get($b->{uri});
-    if ($b1) {
-        my $ignored = $errata->diff_okay($b);
+    my $existing_gcis_ref = $gcis_handle->get($resource_reference->{uri});
+    if ($existing_gcis_ref) {
+        my $ignored = $errata->diff_okay($resource_reference);
         $ignored->{_record_number} = 1;
-        my $d = compare_hash($b, $b1, $ignored);
-        if ($d) {
-            say " NOTE: existing reference different : $b->{uri}";
+        my $difference = compare_hash($resource_reference, $existing_gcis_ref, $ignored);
+        if ($difference) {
+            say " NOTE: existing reference different : $resource_reference->{uri}";
             $STATS{existing_reference_different}++;
-            if (can_fix_item($d)  &&  $do_fix_items) {
-                say " NOTE: can fix reference: $b->{uri}";
+            if (can_fix_item($difference)  &&  $do_fix_items) {
+                say " NOTE: can fix reference: $resource_reference->{uri}";
                 $STATS{"can_fix_reference"}++;
-                fix_item($b, $b1, $ignored);
-                my $fixed_diff = compare_hash($b, $b1, $ignored);
+                fix_item($resource_reference, $existing_gcis_ref, $ignored);
+                my $fixed_diff = compare_hash($resource_reference, $existing_gcis_ref, $ignored);
                 !$fixed_diff or die "didn't fix reference!";
-                update_item($gcis_handle, $b1);
+                update_item($gcis_handle, $existing_gcis_ref);
                 return 0 if $do_not_add_references  ||  
-                            $b1->{child_publication};
+                            $existing_gcis_ref->{child_publication};
             } else {
-                $DIFF{$b->{uri}} = $d;
+                $DIFF{$resource_reference->{uri}} = $difference;
                 return 0;
             }
         } else {
-            say " NOTE: existing reference same : $b->{uri}";
+            say " NOTE: existing reference same : $resource_reference->{uri}";
             $STATS{existing_reference_same}++;
             return 0 if $do_not_add_references  ||  
-                        $b1->{child_publication};
+                        $existing_gcis_ref->{child_publication};
         }
     } elsif (!$do_not_add_references) {
-        add_item($gcis_handle, $b) or return 0;
+        add_item($gcis_handle, $resource_reference) or return 0;
     } else {
         return 0;
     }
 
-    $b->{child_publication_uri} = $a->{uri};
-    add_child_pub($gcis_handle, $b) or return 0;
+    $resource_reference->{child_publication_uri} = $resource->{uri};
+    add_child_pub($gcis_handle, $resource_reference) or return 0;
 
     return 1;
 }
@@ -1239,7 +1245,7 @@ sub massage_bib_attrs {
 # TODO
 # TODO break this up with aggression
 
-sub create_bib {
+sub create_bib_data {
     my $import_args = shift;
     my $gcis_handle = $import_args->{gcis};
     my $errata = $import_args->{errata};
@@ -1267,6 +1273,16 @@ sub update_existing_bib {
     my $gcis_handle = $import_args->{gcis};
     my $errata      = $import_args->{errata};
     my $bib         = $import_args->{bib};
+
+    my $resource_uri = $bib_existing->{uri};
+    my ($resource_path) = ($resource_uri =~ /^\/(.*?)\//);
+
+    if ($dry_run) {
+        say " would update $resource_path : $resource_uri";
+        $N_UPDATES++;
+        $STATS{"would_update_$resource_path"}++;
+        return 1;
+    }
 
     my $ignored = $errata->diff_okay($bib);
     $ignored->{_record_number} = 1;
@@ -1433,21 +1449,35 @@ sub main {
 
     report_initial_state($ref_handler->type_counts);
 
-    my @types_to_process = qw(article report webpage);
+    my %types_to_process = (
+        article => 1,
+        report  => 1,
+        webpage => 1,
+    );
     foreach my $record (@{ $ref_handler->{records} }) {
         $import_args{ref} = $record;
-        $import_args{type} = $TYPE_MAP{$record->{reftype}[0]} or 
+        $import_args{type} = $TYPE_MAP{$record->{reftype}[0]} or
             die " type not known : $record->{reftype}[0]";
-        next unless $do_all_types || (grep $import_args{type} eq $record, @types_to_process);
 
         # Create bib entry
-        $import_args{bib} = create_bib( \%import_args );
+        $import_args{bib} = create_bib_data( \%import_args );
         import_bib( \%import_args );
-        #import_bib_only(\%import_args);
-        # if ( ! $bib_only )
-        # If not $bib_only
-        # Create pub entry
-        # import pub (create/update)
+
+        if ( ! $bib_only ) {
+            # TODO these should be cleaned up and redundant code refactored
+            if ( $import_args{type} = 'article' ) {
+            }
+            if ( $import_args{type} = 'book' ) {
+            }
+            elsif ( $types_to_process{ $import_args{type} } ){
+                # Create pub entry
+                # import pub (create/update)
+            }
+            else {
+                # Not a type we can create
+                # report out?
+            }
+        }
         #elsif ($import_args{type} eq 'article'  &&  !$bib_only) {
         #    import_article(\%import_args);
         #} elsif ((grep $import_args{type} eq $record, qw(webpage report))  && !$bib_only) {
