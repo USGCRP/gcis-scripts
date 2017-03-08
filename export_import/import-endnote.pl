@@ -177,12 +177,12 @@ pod2usage(msg => "missing url or endnote file", verbose => 1) unless ($url && $e
 ## Data Maps
 
 my %DO_NOT_ADD = (
-    journals   = $do_not_add_journals ? 1 : 0;
-    references = $do_not_add_references ? 1 : 0;
-    report     = $do_not_add_items ? 1 : 0;
-    webpage    = $do_not_add_items ? 1 : 0;
-    article    = $do_not_add_items ? 1 : 0;
-    journal    = $do_not_add_items ? 1 : 0;
+    journals   => $do_not_add_journals ? 1 : 0,
+    references => $do_not_add_references ? 1 : 0,
+    report     => $do_not_add_items ? 1 : 0,
+    webpage    => $do_not_add_items ? 1 : 0,
+    article    => $do_not_add_items ? 1 : 0,
+    journal    => $do_not_add_items ? 1 : 0,
 );
 
 my %TYPE_MAP = (
@@ -346,58 +346,131 @@ sub make_identifier {
 # TODO why? 
 
 sub compare_hash {
-    my ($hash_a, $hash_b, $ignore) = @_;
+    my ($endnote_sourced_hash, $existing_hash, $ignore) = @_;
 
     my %hash_result;
-    for (keys %{ $hash_a }) {
+    for (keys %{ $endnote_sourced_hash }) {
         next if $ignore->{$_};
-        next if !defined $hash_a->{$_}  &&  !defined $hash_b->{$_};
-        if (!defined $hash_b->{$_}) {
-           $hash_result{$_} = {_A_ => $hash_a->{$_}, _B_ => undef};
+        next if !defined $endnote_sourced_hash->{$_}  &&  !defined $existing_hash->{$_};
+        if (!defined $existing_hash->{$_}) {
+           $hash_result{$_} = {_A_ => $endnote_sourced_hash->{$_}, _B_ => undef};
            next;
         }
-        if (!defined $hash_a->{$_}) {
-           $hash_result{$_} = {_A_ => undef, _B_ => $hash_b->{$_}};
+        if (!defined $endnote_sourced_hash->{$_}) {
+           $hash_result{$_} = {_A_ => undef, _B_ => $existing_hash->{$_}};
            next;
         }
-        if (ref $hash_a->{$_} eq 'HASH') {
-            my $hash_c1 = compare_hash($hash_a->{$_}, $hash_b->{$_}, $ignore) or next;
+        if (ref $endnote_sourced_hash->{$_} eq 'HASH') {
+            my $hash_c1 = compare_hash($endnote_sourced_hash->{$_}, $existing_hash->{$_}, $ignore) or next;
             $hash_result{$_} = $hash_c1;
             next;
         }
-        next if $hash_a->{$_} eq $hash_b->{$_};
-        my $hash_a1 = lc xml_unescape($hash_a->{$_});
-        my $hash_b1 = lc xml_unescape($hash_b->{$_});
-        for ($hash_a1, $hash_b1) {
-            s/^\s+//; s/\s+$//; s/\.$//; s/\r/; /g;
+        next if $endnote_sourced_hash->{$_} eq $existing_hash->{$_};
+        my $endnote_entry = lc xml_unescape($endnote_sourced_hash->{$_});
+        my $existing_entry = lc xml_unescape($existing_hash->{$_});
+        for ($endnote_entry, $existing_entry) {
+            s/^\s+//; s/\s+$//; # clean leading and trails whitespace.
+            s/\.$//;  # Kill trailing periods.
+            s/\r/; /g; # Replace returns with '; '
         }
-        next if $hash_a1 eq $hash_b1;
+        next if $endnote_entry eq $existing_entry;
         if (lc $_ eq 'author') {
-            next if compare_author($hash_a1, $hash_b1);
+            next if compare_authors($endnote_entry, $existing_entry);
         }
-        $hash_result{$_} = {_A_ => $hash_a->{$_}, _B_ => $hash_b->{$_}};
+        $hash_result{$_} = {_A_ => $endnote_sourced_hash->{$_}, _B_ => $existing_hash->{$_}};
     }
     return %hash_result ? \%hash_result : undef;
+}
+
+# Utility Function to compare if two author lists are the same
+
+sub compare_authors {
+    my ($endnote_author_list, $existing_author_list) = @_;
+    my @endnote_authors = split '; ', $endnote_author_list;
+    my @existing_authors = split '; ', $existing_author_list;
+
+    say "DEBUG: entered into details author comparing";
+    for my $endnote_author (@endnote_authors) {
+        my $existing_author = shift @existing_authors;     # Holds 'Last, First M.'
+
+        say "\tDEBUG: checking endnote author $endnote_author";
+
+        # Mismatch in number of authors.
+        return 0 unless $existing_author;
+
+        # easy case
+        if ( $existing_author eq $endnote_author ) {
+            say "Matched easy case on author $existing_author" if $verbose;
+            next;
+        }
+
+        my ($existing_author_last, $existing_author_first, $existing_author_extra) = split (', ', $existing_author);
+        next if compare_author($endnote_author, $existing_author_first, $existing_author_last, $existing_author_extra);
+
+        # No Match on either
+        say "Failed to match $existing_author with $endnote_author" if $verbose;
+        return 0;
+    }
+    return 1;
 }
 
 # Utility Function to compare if two authors are the same
 
 sub compare_author {
-    my ($author_a, $author_b) = @_;
-    my @author_a1 = split '; ', $author_a;
-    my @author_b1 = split '; ', $author_b;
-    for my $author_a2 (@author_a1) {
-        my $author_b2 = shift @author_b1;
-        return 0 unless $author_b2;
-        my ($author_al, $author_af) = split ', ', $author_a2;
-        my ($author_bl, $author_bf) = split ', ', $author_b2;
-        return 0 if $author_al ne $author_bl;
-        next if !$author_af && !$author_bf;
-        return 0 if $author_af && !$author_bf;
-        return 0 if $author_bf && !$author_af;
-        return 0 if substr($author_af, 0, 1) ne substr($author_bf, 0, 1);
+    my ($endnote_author, $author_first, $author_last, $author_extra) = @_;
+
+    my ($author_first_no_middle) = split ' ', $author_first;
+
+    $author_first //= '';
+    $author_first_no_middle //= '';
+    $author_last //= '';
+    $author_extra //= '';
+
+    my @name_formats;
+
+    # Variation on 'First M. Last'
+    ## With Jr, III
+    push @name_formats, "$author_first $author_last $author_extra";  # "John M. Smith Jr"
+    push @name_formats, "$author_first $author_last, $author_extra"; # "John M. Smith, Jr"
+    ## Without Jr, III
+    push @name_formats, "$author_first $author_last"; # "John M. Smith"
+
+    # Variation on 'First Last', dropping middle
+    ## With Jr, III
+    push @name_formats, "$author_first_no_middle $author_last $author_extra";  # "John M. Smith Jr"
+    push @name_formats, "$author_first_no_middle $author_last, $author_extra"; # "John M. Smith, Jr"
+    ## Without Jr, III
+    push @name_formats, "$author_first_no_middle $author_last"; # "John M. Smith"
+
+    # Variation on 'Last, First M.'
+    ## With Jr, III at the end
+    push @name_formats, "$author_last, $author_first $author_extra";  # "Smith, John M. Jr"
+    push @name_formats, "$author_last, $author_first, $author_extra";  # "Smith, John M., Jr"
+    ## With Jr, III after Last
+    push @name_formats, "$author_last $author_extra, $author_first ";  # "Smith Jr, John M."
+    push @name_formats, "$author_last, $author_extra, $author_first ";  # "Smith, Jr, John M."
+    ## Without Jr, III
+    push @name_formats, "$author_last, $author_first";  # "Smith, John M."
+
+    # Variation on 'Last, First', dropping middle
+    ## With Jr, III at the end
+    push @name_formats, "$author_last, $author_first_no_middle $author_extra";  # "Smith, John Jr"
+    push @name_formats, "$author_last, $author_first_no_middle, $author_extra";  # "Smith, John, Jr"
+    ## With Jr, III after Last
+    push @name_formats, "$author_last $author_extra, $author_first_no_middle ";  # "Smith Jr, John"
+    push @name_formats, "$author_last, $author_extra, $author_first_no_middle ";  # "Smith, Jr, John"
+    ## Without Jr, III
+    push @name_formats, "$author_last, $author_first_no_middle";  # "Smith, John"
+
+
+    for my $existing_author ( @name_formats ){
+        if ( $endnote_author eq $existing_author ) {
+             say "Debug: matched author name $existing_author" if $verbose;
+             return 1;
+        }
     }
-    return 1;
+
+    return 0;
 }
 
 # Utility Function to remove any undef values in a hash
@@ -740,11 +813,11 @@ sub map_attrs {
 sub import_journal_from_article {
     my %args = @_;
 
-    $ref_handler      => $args{ref_handler};
-    $article          => $args{article};
-    $external_article => $args{external_article};
-    $gcis_handle      => $args{gcis_handle};
-    $errata           => $args{errata};
+    my $ref_handler      = $args{ref_handler};
+    my $article          = $args{article};
+    my $external_article = $args{external_article};
+    my $gcis_handle      = $args{gcis_handle};
+    my $errata           = $args{errata};
 
     # Build the Journal Resource
     my $journal;
@@ -791,7 +864,7 @@ sub import_journal_from_article {
         return 0;
     }
 
-    return $journal->{identifier};
+    return $journal;
 }
 
 sub update_existing_resource {
@@ -810,11 +883,13 @@ sub update_existing_resource {
     elsif ( $resource_type eq 'webpage' || $resource_type eq 'report' ) {
         $ignored->{uri} = 1;
     }
-    my $DIFF = compare_hash($new_resource, $existing_resource, $ignored);
-    if ($DIFF) {
+    my $difference = compare_hash($new_resource, $existing_resource, $ignored);
+    if ($difference) {
         say " NOTE: existing $resource_type different : $new_resource->{uri}";
-        $STATS{existing_".$resource_type."_different}++;
-        if (can_fix_item($DIFF)  &&  $do_fix_items) {
+        print " DEBUG " if $verbose;
+        print Dumper $difference if $verbose;
+        $STATS{"existing_${resource_type}_different"}++;
+        if (can_fix_item($difference)  &&  $do_fix_items) {
             say " NOTE: can fix $resource_type : $existing_resource->{uri}";
             $STATS{"can_fix_".$resource_type}++;
             fix_item($new_resource, $existing_resource, $ignored);
@@ -823,12 +898,12 @@ sub update_existing_resource {
             update_item($gcis_handle, $new_resource);
             $new_resource->{uri} = $existing_resource->{uri};
         } else {
-            $DIFF{$new_resource->{uri}} = $DIFF;
+            $DIFF{$new_resource->{uri}} = $difference;
             return 0;
         }
     } else {
         say " NOTE: existing $resource_type same : $new_resource->{uri}";
-        $STATS{existing_".$resource_type."_same}++;
+        $STATS{"existing_".$resource_type."_same"}++;
         $new_resource->{uri} = $existing_resource->{uri};
     }
 }
@@ -914,7 +989,7 @@ sub import_article {
 
     $article->{uri} = "/article/$article->{identifier}";
 
-    my $journal_identifier = import_journal_from_article( 
+    my $journal = import_journal_from_article( 
         ref_handler      => $ref_handler,
         article          => $article,
         external_article => $external_article,
@@ -923,7 +998,7 @@ sub import_article {
     );
 
     # Back to Article handling - set journal on article and fix errata TODO
-    $article->{journal_identifier} = $journal_identifier;
+    $article->{journal_identifier} = $journal->{identifier};
     $errata->fix_errata($article);
 
     say " art :\n".Dumper($article) if $verbose;
@@ -932,12 +1007,14 @@ sub import_article {
     if ($check_external) {
         my $ignored = $errata->diff_okay($article);
         $ignored->{$_} = 1 for qw(uri identifier journal_identifier url);
-        my $DIFF = compare_hash($article, $external_article, $ignored);
-        if ($DIFF) {
-            $DIFF{$article->{uri}} = $DIFF;
+        my $difference = compare_hash($article, $external_article, $ignored);
+        if ($difference) {
+            $DIFF{$article->{uri}} = $difference;
             say " NOTE: external source article different : $article->{uri}";
+            print " DEBUG ";
+            print Dumper $difference;
             $STATS{external_source_article_different}++;
-           return 0;
+           return 0; # TODO Should this really return...?
         }
     }
 
@@ -1022,6 +1099,8 @@ sub import_article {
         my $ignored = $errata->diff_okay($article_reference);
         $ignored->{_record_number} = 1;
         my $difference = compare_hash($article_reference, $existing_gcis_ref, $ignored);
+            print " DEBUG ";
+            print Dumper $difference;
         if ($difference) {
             say " NOTE: existing reference different : $article_reference->{uri}";
             $STATS{existing_reference_different}++;
@@ -1466,7 +1545,7 @@ sub main {
     $import_args{alt_ids} = load_alt_ids($alt_id_file);
 
     # Internal config switches
-    my $bib_only = 0;
+    my $bib_only = 1;
     my $do_all_types = 1;
 
     report_initial_state($ref_handler->type_counts);
@@ -1481,17 +1560,20 @@ sub main {
         $import_args{type} = $TYPE_MAP{$record->{reftype}[0]} or
             die " type not known : $record->{reftype}[0]";
 
-        # Create bib entry
-        $import_args{bib} = create_bib_data( \%import_args );
-        import_bib( \%import_args );
-
+        # Create bib entry (Since this always happens, why can't we do this?
         if ( ! $bib_only ) {
+            $import_args{bib} = create_bib_data( \%import_args );
+            import_bib( \%import_args );
+        }
+        else {
             # TODO these should be cleaned up and redundant code refactored
-            if ( $import_args{type} = 'article' ) {
+            if ( $import_args{type} eq 'article' ) {
+                import_article(\%import_args); 
             }
-            if ( $import_args{type} = 'book' ) {
-            }
+            #if ( $import_args{type} eq 'book' ) {
+            #}
             elsif ( $types_to_process{ $import_args{type} } ){
+                import_other(\%import_args);
                 # Create pub entry
                 # import pub (create/update)
             }
