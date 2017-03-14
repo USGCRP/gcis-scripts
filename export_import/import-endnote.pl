@@ -287,7 +287,7 @@ my %BIB_MULTI = (
 my %DIFF;
 my $N_UPDATES = 0;
 my %STATS;
-my $skip_dois = 1;
+my $skip_dois = 1; # unused?
 my $do_fix_items = 1;
 
 &main;
@@ -375,7 +375,7 @@ sub compare_hash {
         }
         next if $endnote_entry eq $existing_entry;
         if (lc $_ eq 'author') {
-            next if compare_authors($endnote_entry, $existing_entry);
+            next if compare_authors(lc $endnote_entry, lc $existing_entry);
         }
         $hash_result{$_} = {_A_ => $endnote_sourced_hash->{$_}, _B_ => $existing_hash->{$_}};
     }
@@ -389,88 +389,65 @@ sub compare_authors {
     my @endnote_authors = split '; ', $endnote_author_list;
     my @existing_authors = split '; ', $existing_author_list;
 
-    say "DEBUG: entered into details author comparing";
     for my $endnote_author (@endnote_authors) {
         my $existing_author = shift @existing_authors;     # Holds 'Last, First M.'
-
-        say "\tDEBUG: checking endnote author $endnote_author";
 
         # Mismatch in number of authors.
         return 0 unless $existing_author;
 
         # easy case
         if ( $existing_author eq $endnote_author ) {
-            say "Matched easy case on author $existing_author" if $verbose;
             next;
         }
 
-        my ($existing_author_last, $existing_author_first, $existing_author_extra) = split (', ', $existing_author);
-        next if compare_author($endnote_author, $existing_author_first, $existing_author_last, $existing_author_extra);
+        my ($existing_author_last, $existing_author_first) = split (', ', $existing_author);
+        next if compare_author($endnote_author, $existing_author_first, $existing_author_last);
 
         # No Match on either
-        say "Failed to match $existing_author with $endnote_author" if $verbose;
         return 0;
     }
     return 1;
 }
 
 # Utility Function to compare if two authors are the same
+# We care if the last name and first initial are the same
+# We can ignore ", jr", ", II", and ", III". We always ignore middle initials
+# We can handle the formats First M. Last and Last, First M.
+# We ignore punctuation characters.
+# This occasionally still pops up a false positive, but they should be minimal
 
 sub compare_author {
-    my ($endnote_author, $author_first, $author_last, $author_extra) = @_;
+    my ($endnote_author, $author_first, $author_last) = @_;
 
-    my ($author_first_no_middle) = split ' ', $author_first;
+    # Clean out generational marker
+    $endnote_author =~ s/", jr"//;
+    $endnote_author =~ s/", ii"//i;
+    $endnote_author =~ s/", iii"//i;
 
-    $author_first //= '';
-    $author_first_no_middle //= '';
-    $author_last //= '';
-    $author_extra //= '';
-
-    my @name_formats;
-
-    # Variation on 'First M. Last'
-    ## With Jr, III
-    push @name_formats, "$author_first $author_last $author_extra";  # "John M. Smith Jr"
-    push @name_formats, "$author_first $author_last, $author_extra"; # "John M. Smith, Jr"
-    ## Without Jr, III
-    push @name_formats, "$author_first $author_last"; # "John M. Smith"
-
-    # Variation on 'First Last', dropping middle
-    ## With Jr, III
-    push @name_formats, "$author_first_no_middle $author_last $author_extra";  # "John M. Smith Jr"
-    push @name_formats, "$author_first_no_middle $author_last, $author_extra"; # "John M. Smith, Jr"
-    ## Without Jr, III
-    push @name_formats, "$author_first_no_middle $author_last"; # "John M. Smith"
-
-    # Variation on 'Last, First M.'
-    ## With Jr, III at the end
-    push @name_formats, "$author_last, $author_first $author_extra";  # "Smith, John M. Jr"
-    push @name_formats, "$author_last, $author_first, $author_extra";  # "Smith, John M., Jr"
-    ## With Jr, III after Last
-    push @name_formats, "$author_last $author_extra, $author_first ";  # "Smith Jr, John M."
-    push @name_formats, "$author_last, $author_extra, $author_first ";  # "Smith, Jr, John M."
-    ## Without Jr, III
-    push @name_formats, "$author_last, $author_first";  # "Smith, John M."
-
-    # Variation on 'Last, First', dropping middle
-    ## With Jr, III at the end
-    push @name_formats, "$author_last, $author_first_no_middle $author_extra";  # "Smith, John Jr"
-    push @name_formats, "$author_last, $author_first_no_middle, $author_extra";  # "Smith, John, Jr"
-    ## With Jr, III after Last
-    push @name_formats, "$author_last $author_extra, $author_first_no_middle ";  # "Smith Jr, John"
-    push @name_formats, "$author_last, $author_extra, $author_first_no_middle ";  # "Smith, Jr, John"
-    ## Without Jr, III
-    push @name_formats, "$author_last, $author_first_no_middle";  # "Smith, John"
-
-
-    for my $existing_author ( @name_formats ){
-        if ( $endnote_author eq $existing_author ) {
-             say "Debug: matched author name $existing_author" if $verbose;
-             return 1;
-        }
+    my ($endnote_first, $endnote_last);
+    if ( $endnote_author !~ /,/ ) { 
+    # Handle the First M. Last format
+       $endnote_author =~ s/[[:punct:]]//g;
+       ($endnote_first, $endnote_last) = $endnote_author =~ /^(.*) (\w+)$/g;
+    } else {
+    # Handle the Last, First M. format
+       ($endnote_last, $endnote_first) = $endnote_author =~ /^(\w+), (.*)$/g;
+       $endnote_last =~ s/[[:punct:]]//g;
+       $endnote_first =~ s/[[:punct:]]//g;
     }
 
-    return 0;
+    # fail if last names don't match
+    return 0 if $author_last ne $endnote_last;
+    # move on if no first name
+    return 1 if !$author_first && !$endnote_first;
+    # Fail if one has a first but the other doesn't
+    return 0 if $author_first && !$endnote_first;
+    # Fail if the other one has a first but the other doesn't
+    return 0 if !$author_first && $endnote_first;
+    # Fail if the first initials don't match
+    return 0 if substr($author_first, 0, 1) ne substr($endnote_first, 0, 1);
+
+    return 1;
 }
 
 # Utility Function to remove any undef values in a hash
@@ -1545,8 +1522,8 @@ sub main {
     $import_args{alt_ids} = load_alt_ids($alt_id_file);
 
     # Internal config switches
-    my $bib_only = 1;
-    my $do_all_types = 1;
+    my $bib_only = 0;
+    my $do_all_types = 1; # unused
 
     report_initial_state($ref_handler->type_counts);
 
