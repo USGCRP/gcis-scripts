@@ -548,21 +548,35 @@ sub can_fix_item {
     return 1;
 }
 
-# Given three hashes with existing value, fixed values, and values to ignore
-# Update the values in the fixed hash to be correct.
+# Given three hashes with built-from-endnote value, the pulled-from-gcis values, and values to ignore
+# Update the values in the gcis hash to match the endnote, so long as those values did not exist in gcis.
 # TODO: what does 'fix' imply here?
 
 sub fix_item {
-    my ($existing, $fixed, $ignore) = @_;
-    for (keys %{ $existing }) {
+    my ($endnote, $gcis, $ignore) = @_;
+    for (keys %{ $endnote }) {
+        my $one = $endnote->{$_} ? $endnote->{$_} : '';
+        my $two = $gcis->{$_} ? $gcis->{$_} : '';
+        my $thr = $ignore->{$_} ? $ignore->{$_} : '';
+        say "\t DEBUG: Checking key {{ $_ }}. Endnote: {{ $one }} GCIS: {{ $two }} Ignore? {{ $thr }}.";
         next if $ignore->{$_};
-        if (ref $existing->{$_} eq 'HASH') {
-            fix_item($existing->{$_}, $fixed->{$_}, $ignore);
+        if (ref $endnote->{$_} eq 'HASH') {
+            fix_item($endnote->{$_}, $gcis->{$_}, $ignore);
             next;
         }
-        next unless defined $existing->{$_};
-        next if defined $fixed->{$_};
-        $fixed->{$_} = $existing->{$_};
+        #say "\t DEBUG: checking the diff";
+        #print "\t Endnote:";
+        #say Dumper $endnote;
+        #print "\t GCIS: ";
+        #say Dumper $gcis;
+        #say "\t\t DEBUG: checking that _A_ HAS a value;";
+
+        next unless defined $endnote->{$_};
+        #say "\t\t DEBUG: checking that _B_ DOESN'T have a value;";
+        next if defined $gcis->{$_};
+        #say "\t\t DEBUG: A has a value, B doesn't. Right?";
+        $gcis->{$_} = $endnote->{$_};
+        say "\t DEBUG: \t Post Assignment, key {{ $_ }}. Endnote: {{ $endnote->{$_} }} GCIS: {{ $gcis->{$_} }}";
     }
     return 1;
 }
@@ -977,6 +991,15 @@ sub import_article {
     # Back to Article handling - set journal on article and fix errata TODO
     $article->{journal_identifier} = $journal->{identifier};
     $errata->fix_errata($article);
+    #say STDOUT "DEBUG: IN Fix Errata!";
+    #my $uri = $article->{uri};# or return 0;
+    #say "DEBUG: Found A Resourse URI";
+    #my $uri_errata = $errata->{e}->{$uri} ;#or return 1;
+    #for (@{ $uri_errata }) {
+    #    say "Fixing Errata! Here's the _ for array { i }:";
+    #    say Dumper $_;
+    #    $errata->_fix_items($_, $article);
+    #}
 
     say " art :\n".Dumper($article) if $verbose;
 
@@ -1347,12 +1370,13 @@ sub create_bib_data {
 }
 
 sub update_existing_bib {
-    my ($import_args, $bib_existing) = shift;
-    my $gcis_handle = $import_args->{gcis};
-    my $errata      = $import_args->{errata};
-    my $bib         = $import_args->{bib};
+    my ($import_args) = shift;
+    my $gcis_handle  = $import_args->{gcis};
+    my $errata       = $import_args->{errata};
+    my $bib          = $import_args->{bib};
+    my $bib_existing = $import_args->{existing};
 
-    my $resource_uri = $bib_existing->{uri};
+    my $resource_uri = $bib->{uri};
     my ($resource_path) = ($resource_uri =~ /^\/(.*?)\//);
 
     if ($dry_run) {
@@ -1374,6 +1398,7 @@ sub update_existing_bib {
             fix_item($bib, $bib_existing, $ignored);
             my $fixed_diff = compare_hash($bib, $bib_existing, $ignored);
             !$fixed_diff or die "didn't fix reference!";
+            say " NOTE: Diff fixed. Updating reference : $bib->{uri}";
             update_item($gcis_handle, $bib_existing);
         } else {
             $DIFF{$bib->{uri}} = $difference;
@@ -1393,7 +1418,8 @@ sub import_bib {
 
     my $bib_existing = $gcis_handle->get($bib->{uri});
     if ($bib_existing) {
-        update_existing_bib($import_args, $bib_existing);
+        $import_args->{existing} = $bib_existing;
+        update_existing_bib($import_args);
     } elsif (!$DO_NOT_ADD{ references }) {
         add_item($gcis_handle, $bib);
     }
@@ -1538,7 +1564,7 @@ sub main {
             die " type not known : $record->{reftype}[0]";
 
         # Create bib entry (Since this always happens, why can't we do this?
-        if ( ! $bib_only ) {
+        if ( $bib_only ) {
             $import_args{bib} = create_bib_data( \%import_args );
             import_bib( \%import_args );
         }
