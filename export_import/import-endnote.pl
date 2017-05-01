@@ -63,6 +63,11 @@ set to -1 update all)
 Maximum number of references to read from the Endnote file 
 (defaults to 40; set to -1 to read all)
 
+=item B<--only_references>
+
+Do not try to even process the Resources associated with the
+imported references.
+
 =item B<--do_not_add_journals>
 
 Flag indicating journals are not to be added
@@ -81,15 +86,20 @@ Time to wait between GCIS updates (seconds; defaults to -1 - do not wait)
 
 =item B<--errata_file>
 
-Errata file (yaml) - contains aliases for entries that
+Errata file (yaml) - contains endnote aliases for entries that
 already exists (see below for file example)
 
 =item B<--diff_file>
 
-Difference file (yaml) - contains differences between the new
+Difference file (yaml) - will contain differences between the new
 entry and an existing GCIS entry
 
-=idem B<--alt_id_file>
+=item B<--references_file>
+
+References file (csv) - will contain the URIs for each reference
+processed
+
+=item B<--alt_id_file>
 
 Alternate id file (yaml) containing a mapping between a url
 and an alternate id.
@@ -160,12 +170,14 @@ GetOptions(
     'endnote_file=s'        => \(my $endnote_file),
     'max_updates=i'         => \(my $max_updates = 10),
     'max_references=i'      => \(my $max_references = 40),
+    'only_references'       => \(my $only_references),
     'do_not_add_journals'   => \(my $do_not_add_journals),
     'do_not_add_items'      => \(my $do_not_add_items),
     'do_not_add_referneces' => \(my $do_not_add_references),
     'wait=i'                => \(my $wait = -1),
     'errata_file=s'         => \(my $errata_file),
     'diff_file=s'           => \(my $diff_file),
+    'references_file=s'     => \(my $references_file),
     'alt_id_file=s'         => \(my $alt_id_file), 
     'verbose'               => \(my $verbose),
     'dry_run|n'             => \(my $dry_run),
@@ -194,6 +206,7 @@ my %TYPE_MAP = (
    'Report' => 'report',
    'Manuscript' => 'report',
    'Journal Article' => 'article',
+   'Electronic Article' => 'generic_article',
    'Web Page' => 'webpage',
    'Dataset' => 'dataset',
    'Conference Paper' => 'generic_cpaper', 
@@ -285,6 +298,7 @@ my %BIB_MULTI = (
 
 
 my %DIFF;
+my @REFS;
 my $N_UPDATES = 0;
 my %STATS;
 my $skip_dois = 1; # unused?
@@ -475,7 +489,7 @@ sub update_item {
     my ($resource_path) = ($resource_uri =~ /^\/(.*?)\//);
 
     if ($dry_run) {
-        say " would update $resource_path : $resource_uri";
+        say "NOTE: would update $resource_path : $resource_uri";
         $N_UPDATES++;
         $STATS{"would_update_$resource_path"}++;
         return 1;
@@ -558,7 +572,7 @@ sub fix_item {
         my $one = $endnote->{$_} ? $endnote->{$_} : '';
         my $two = $gcis->{$_} ? $gcis->{$_} : '';
         my $thr = $ignore->{$_} ? $ignore->{$_} : '';
-        say "\t DEBUG: Checking key {{ $_ }}. Endnote: {{ $one }} GCIS: {{ $two }} Ignore? {{ $thr }}.";
+        say "\t DEBUG: Checking key {{ $_ }}. Endnote: {{ $one }} GCIS: {{ $two }} Ignore? {{ $thr }}." if $verbose;
         next if $ignore->{$_};
         if (ref $endnote->{$_} eq 'HASH') {
             fix_item($endnote->{$_}, $gcis->{$_}, $ignore);
@@ -576,7 +590,7 @@ sub fix_item {
         next if defined $gcis->{$_};
         #say "\t\t DEBUG: A has a value, B doesn't. Right?";
         $gcis->{$_} = $endnote->{$_};
-        say "\t DEBUG: \t Post Assignment, key {{ $_ }}. Endnote: {{ $endnote->{$_} }} GCIS: {{ $gcis->{$_} }}";
+        say "\t DEBUG: \t Post Assignment, key {{ $_ }}. Endnote: {{ $endnote->{$_} }} GCIS: {{ $gcis->{$_} }}" if $verbose;
     }
     return 1;
 }
@@ -822,6 +836,9 @@ sub import_journal_from_article {
     $journal->{online_issn} = $external_article->{issn}[1];
     $journal->{publisher} = $external_article->{publisher};
 
+    if (!$journal->{print_issn}  &&  !$journal->{online_issn}) {
+        $journal->{print_issn} = xml_unescape($ref_handler->{isbn}[0]);
+    }
     # Pull any matching existing GCIS Journal
     my $journalGCIS = get_item($gcis_handle, 'journal', $journal);
 
@@ -830,7 +847,7 @@ sub import_journal_from_article {
 
     say " jou :\n".Dumper($journal) if $verbose;
 
-    # Ensure _keywe have some identifier for the Journal
+    # Ensure we have some identifier for the Journal
     if (!$journalGCIS) {
         if (!$journal->{print_issn}  &&  !$journal->{online_issn}) {
             say " ERROR: no journal issn : $journal->{uri} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
@@ -1091,6 +1108,7 @@ sub import_article {
 
     say " bib :\n".Dumper($article_reference) if $verbose;
 
+    push @REFS, $article_reference->{uri};
     # Update or Add the reference
     # Handle the DIFF issues in the update
     my $existing_gcis_ref = $gcis_handle->get($article_reference->{uri});
@@ -1257,6 +1275,7 @@ sub import_other {
 
     say " bib :\n".Dumper($resource_reference) if $verbose;
 
+    push @REFS, $resource_reference->{uri};
     my $existing_gcis_ref = $gcis_handle->get($resource_reference->{uri});
     if ($existing_gcis_ref) {
         my $ignored = $errata->diff_okay($resource_reference);
@@ -1379,13 +1398,6 @@ sub update_existing_bib {
     my $resource_uri = $bib->{uri};
     my ($resource_path) = ($resource_uri =~ /^\/(.*?)\//);
 
-    if ($dry_run) {
-        say " would update $resource_path : $resource_uri";
-        $N_UPDATES++;
-        $STATS{"would_update_$resource_path"}++;
-        return 1;
-    }
-
     my $ignored = $errata->diff_okay($bib);
     $ignored->{_record_number} = 1;
     my $difference = compare_hash($bib, $bib_existing, $ignored);
@@ -1416,6 +1428,7 @@ sub import_bib {
     my $gcis_handle = $import_args->{gcis};
     my $bib         = $import_args->{bib};
 
+    push @REFS, $bib->{uri};
     my $bib_existing = $gcis_handle->get($bib->{uri});
     if ($bib_existing) {
         $import_args->{existing} = $bib_existing;
@@ -1470,6 +1483,17 @@ sub dump_diff {
     return 1;
 }
 
+sub dump_references {
+
+    my $n_refs = scalar @REFS;
+    return 1 if $n_refs == 0  ||  !$references_file;
+    open my $f, '>:encoding(UTF-8)', "$references_file" or die "can't open REF file";
+    print $f "$_\n" for ( @REFS );
+    close $f;
+
+    return 1;
+
+}
 # Utility Function Given a file containing alternate IDs, load the YAML file into perl
 
 sub load_alt_ids {
@@ -1499,6 +1523,7 @@ sub report_initial_state {
     say "   endnote_file : $endnote_file";
     say "   max_updates : $max_updates";
     say "   max_references : $max_references";
+    say "   only_references" if $only_references;
     say "   do_not_add_journals" if $do_not_add_journals;
     say "   do_not_add_items" if $do_not_add_items;
     say "   do_not_add_referneces" if $do_not_add_references;
@@ -1548,7 +1573,6 @@ sub main {
     $import_args{alt_ids} = load_alt_ids($alt_id_file);
 
     # Internal config switches
-    my $bib_only = 0;
     my $do_all_types = 1; # unused
 
     report_initial_state($ref_handler->type_counts);
@@ -1564,7 +1588,7 @@ sub main {
             die " type not known : $record->{reftype}[0]";
 
         # Create bib entry (Since this always happens, why can't we do this?
-        if ( $bib_only ) {
+        if ( $only_references ) {
             $import_args{bib} = create_bib_data( \%import_args );
             import_bib( \%import_args );
         }
@@ -1582,7 +1606,9 @@ sub main {
             }
             else {
                 # Not a type we can create
-                # report out?
+                # Just make the references
+                $import_args{bib} = create_bib_data( \%import_args );
+                import_bib( \%import_args );
             }
         }
         #elsif ($import_args{type} eq 'article'  &&  !$bib_only) {
@@ -1595,6 +1621,7 @@ sub main {
     }
 
     dump_diff;
+    dump_references;
     report_final_state;
 
     return;
