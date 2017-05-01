@@ -906,7 +906,7 @@ sub update_existing_resource {
             update_item($gcis_handle, $new_resource);
             $new_resource->{uri} = $existing_resource->{uri};
         } else {
-            $DIFF{$new_resource->{uri}} = $difference;
+            add_to_diff($new_resource->{uri}, $difference);
             return 0;
         }
     } else {
@@ -1026,7 +1026,7 @@ sub import_article {
         $ignored->{$_} = 1 for qw(uri identifier journal_identifier url);
         my $difference = compare_hash($article, $external_article, $ignored);
         if ($difference) {
-            $DIFF{$article->{uri}} = $difference;
+            add_to_diff($article->{uri}, $difference);
             say " NOTE: external source article different : $article->{uri}";
             print " DEBUG ";
             print Dumper $difference;
@@ -1132,7 +1132,7 @@ sub import_article {
                 return 0 if $DO_NOT_ADD{ references }  ||
                             $existing_gcis_ref->{child_publication};
             } else {
-                $DIFF{$article_reference->{uri}} = $difference;
+                add_to_diff($article_reference->{uri}, $difference);
                 return 0;
             }
         } else {
@@ -1294,7 +1294,7 @@ sub import_other {
                 return 0 if $DO_NOT_ADD{ references }  ||  
                             $existing_gcis_ref->{child_publication};
             } else {
-                $DIFF{$resource_reference->{uri}} = $difference;
+                add_to_diff($resource_reference->{uri}, $difference);
                 return 0;
             }
         } else {
@@ -1407,13 +1407,15 @@ sub update_existing_bib {
         if (can_fix_item($difference)  &&  $do_fix_items) {
             say " NOTE: can fix reference: $bib->{uri}";
             $STATS{"can_fix_reference"}++;
+            #say Dumper $bib_existing;
             fix_item($bib, $bib_existing, $ignored);
+            #say Dumper $bib_existing;
             my $fixed_diff = compare_hash($bib, $bib_existing, $ignored);
             !$fixed_diff or die "didn't fix reference!";
             say " NOTE: Diff fixed. Updating reference : $bib->{uri}";
             update_item($gcis_handle, $bib_existing);
         } else {
-            $DIFF{$bib->{uri}} = $difference;
+            add_to_diff($bib->{uri}, $difference);
             return 0;
         }
     } else {
@@ -1456,6 +1458,24 @@ sub format_diff {
     $e->{value} = $d->{_B_};
     $e->{alias} = $d->{_A_};
     return $e;
+}
+
+# Utility Function: When a URI has a difference to note, make sure
+# it adds it in a unique way not relying on uri to be distinct
+sub add_to_diff {
+    my ($uri, $diff, $inc) = @_;
+
+    my $cur_uri = $inc ? "$uri-$inc" : $uri;
+
+    if ( exists $DIFF{$cur_uri} ) {
+        say " WARN: existing URI diff for $cur_uri";
+        $inc++;
+        add_to_diff($uri, $diff, $inc);
+    }
+    else {
+       $DIFF{$cur_uri} = $diff;
+    }
+    return 1;
 }
 
 # Utility Function Given a DIFF filename, dump the DIFF out to it
