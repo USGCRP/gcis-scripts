@@ -199,7 +199,7 @@ my %DO_NOT_ADD = (
 
 my %TYPE_MAP = (
    'Book' => 'book',
-   'Edited Book' => 'book',
+   'Edited Book' => 'edited_book',
    'Electronic Book' => 'book',
    'Book Section' => 'book_section', 
    'Electronic Book Section' => 'book_section',
@@ -223,6 +223,11 @@ my $BIB_TYPE_KEY_MAP = {
         'Publication Title' => undef,
         'Secondary Title' => 'Journal', 
         'ISBN' => undef, 
+    },
+    edited_book => {
+        'Issue' => 'Edition',
+        'Pages' => 'Number of Pages',
+        'Author' => 'Editor',
     },
     book => {
         'Issue' => 'Edition', 
@@ -258,6 +263,7 @@ my $BIB_TYPE_KEY_MAP = {
 my %REF_TYPE_NUM = (
    article => 0,
    book => 9,
+   edited_book => 9,
    book_section => 7,
    generic_legal => 32,
    generic_press => 63,
@@ -1362,9 +1368,6 @@ sub massage_bib_attrs {
     return $bib_attrs;
 }
 
-# TODO
-# TODO break this up with aggression
-
 sub create_bib_data {
     my $import_args = shift;
     my $gcis_handle = $import_args->{gcis};
@@ -1617,8 +1620,6 @@ sub main {
             if ( $import_args{type} eq 'article' ) {
                 import_article(\%import_args); 
             }
-            #if ( $import_args{type} eq 'book' ) {
-            #}
             elsif ( $types_to_process{ $import_args{type} } ){
                 import_other(\%import_args);
                 # Create pub entry
