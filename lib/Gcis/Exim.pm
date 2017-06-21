@@ -82,6 +82,27 @@ my @common_ignore_dst_items = qw(
 
 my $compare_say_same = 0;  # turns on full output (same as well as differences)
 
+sub extract_type_from_uri {
+    my $s = shift;
+    my $uri = shift;
+    my $type;
+
+    $uri = "/$uri" unless $uri =~ m[^/];
+    $uri = "$uri/" unless $uri =~ m[/$];
+    my @split_uri = split('/', $uri);
+    ## Check for a wildcard type
+    return 'article' if $split_uri[1] eq 'article';
+
+    # even split means we have a group URI, take the last non-blank item
+    if ( scalar @split_uri % 2 == 0 ) {
+        return $split_uri[-1];
+    }
+    # specific URI, take the second to last non-blank item
+    else {
+        return $split_uri[-2];
+    }
+}
+
 sub _update_item_href {
     my $s = shift;
     my $v = shift;
