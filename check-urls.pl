@@ -113,6 +113,7 @@ GetOptions(
 ) or die pod2usage(verbose => 1);
 
 pod2usage(msg => "missing type", verbose => 1) unless $type;
+pod2usage(msg => "missing count & page or all", verbose => 1) unless ($all || ( $count && $page) );
 pod2usage(msg => "Bad type, select from: " . join(", ", keys %TYPES), verbose => 1) unless $TYPES{$type};
 
 $url = "https://data-stage.globalchange.gov" unless $url;
@@ -131,7 +132,7 @@ while ( $count > 0)
     my $resources = $g->get($query);
 
     my $res_count = scalar @$resources;
-    warn "Processing $res_count URL queries. Expect this script to run for " . ($res_count * 3 / 60) . " minutes." if $all;
+    warn "Processing $res_count URL queries. Expect this script to run for " .  ($res_count / 60) . " to " . ($res_count * 3 / 60) . " minutes." if $all;
     my $index = 0;
     for my $resource ( @$resources ) {
         my $resource_url = $resource->{url} ? $resource->{url} : "";
