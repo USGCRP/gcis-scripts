@@ -71,7 +71,7 @@ sub _load_errata {
 sub _fix_items {
     my ($errata, $resource) = @_;
     for my $resource_key (keys %{ $resource }) {
-        my $errata_item = $e->{$resource_key} or next;
+        my $errata_item = $errata->{$resource_key} or next;
         my $kv = 0;
         for my $k (qw(alias value)) {
             $kv++ if grep $k eq $_, keys %{ $errata_item };

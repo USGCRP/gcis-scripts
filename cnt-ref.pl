@@ -34,12 +34,6 @@ Count of references for the resource
 
 Set to indicate all resources are to counted.
 
-=item B<--local>
-
-Directory to store file (defaults to ".")
-
-=back
-
 =head1 EXAMPLES
 
 Count the number of references for the chapters in the nca3 report
@@ -85,38 +79,39 @@ sub main {
 
     my $g = Gcis::Client->new(url => $url);
 
-    my $r = $g->get("$res$do_all") or die " no resource";
-    if (ref $r ne 'ARRAY') {
-       $r = [$r];
+    my $resources = $g->get("$res$do_all") or die " no resource";
+    if (ref $resources ne 'ARRAY') {
+       $resources = [$resources];
     }
 
-    my $n = 0;
-    my $nr = 0;
-    my $m = 0;
-    my %refs;
-    for (@{ $r }) {
-        my $u = $_->{uri};
-        $n++;
-        my $id = $_->{identifier};
+    my $num_resources = 0;
+    my $resource_with_ref = 0;
+    my $num_total_refs = 0;
+    my %all_resources_refs;
+    for my $resource (@{ $resources }) {
+        my $resource_uri = $resource->{uri};
+        $num_resources++;
+        my $resource_id = $resource->{identifier};
 
-        my $ref = $g->get("$u/reference.json$do_all") or do {
-          say " $id : error";
+        my $ref = $g->get("$resource_uri/reference.json$do_all") or do {
+          say " $resource_id : error";
           next;
         };
-        my $nref = scalar @{ $ref };
-        next if $nref == 0;
-        map {$refs{$_->{uri}}++} @{ $ref };
-        say " $id : $nref";
-        $m += $nref;
-        $nr++;
+        my $num_resource_refs = scalar @{ $ref };
+        say sprintf("%-50s", $resource_id) . " : " . sprintf("%6s", $num_resource_refs);
+        next if $num_resource_refs == 0;
+        map {$all_resources_refs{$_->{uri}}++} @{ $ref };
+        $num_total_refs += $num_resource_refs;
+        $resource_with_ref++;
     }
 
-    my $mu = keys %refs;
+    my $all_unique_references = keys %all_resources_refs;
     say "";
-    say " $res : $n";
-    say " total : $m";
-    say " unique : $mu";
-    say " have ref : $nr";
+    say "For Resource(s) $res : ";
+    say " Count of resources                      : " . sprintf("%6s", $num_resources);
+    say " Resources with Non-Zero Reference Count : " . sprintf("%6s", $resource_with_ref);
+    say " Total References across All Resources   : " . sprintf("%6s", $num_total_refs);
+    say " Unique References across All Resources  : " . sprintf("%6s", $all_unique_references);
 
     say " done";
     return;
