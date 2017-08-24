@@ -12,7 +12,7 @@ Many scripts in this collection are copied and pasted from each other and other 
    `git clone https://github.com/USGCRP/gcis-pl-client`  
    `git clone https://github.com/USGCRP/gcis-scripts`
  - Add the libs to `PERL5LIB`  
-   `echo export PERL5LIB=$PERL5LIB:/home/testuser/repos/gcis-pl-client/lib/:/home/testuser/repos/gcis-scripts/lib/ >>~/.bashrc`
+   `echo export PERL5LIB=$PERL5LIB:~/repos/gcis-pl-client/lib/:~/repos/gcis-scripts/lib/ >>~/.bashrc`
  - Install Perlbrew and the perl version  
    `\curl -L https://install.perlbrew.pl | bash`  
    `perlbrew install perl-5.20.3` #long running  
