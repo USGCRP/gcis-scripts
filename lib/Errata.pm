@@ -71,7 +71,9 @@ sub _load_errata {
 sub _fix_items {
     my ($errata, $resource) = @_;
     for my $resource_key (keys %{ $resource }) {
+        # do we have errata for this key on this URI?
         my $errata_item = $errata->{$resource_key} or next;
+        # this code is to find the leaves
         my $kv = 0;
         for my $k (qw(alias value)) {
             $kv++ if grep $k eq $_, keys %{ $errata_item };
@@ -81,8 +83,12 @@ sub _fix_items {
             next;
         }
         next unless $kv == 2;
+        # we are at the leaf
+        # no good if this isn't the allowed alias
         next unless $errata_item->{alias} eq $resource->{$resource_key};
+        # generic okay diff
         next if $errata_item->{value} eq '_DIFF_OKAY_';
+        # set the resource's write value to the errata
         $resource->{$resource_key} = $errata_item->{value};
     }
     return 1;
