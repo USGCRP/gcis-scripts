@@ -24,11 +24,15 @@ The GCIS instance URL
 
 The file containing the DOIs to query
 
+=item B<--csv>
+
+The file to print the output to
+
 =back
 
 =head1 EXAMPLES
 
-./find-authors-from-orcid.pl --url "https://data.globalchange.gov" --doi doi-file.txt
+./find-authors-from-orcid.pl --url "https://data.globalchange.gov" --doi doi-file.txt --csv output.csv
 
 =cut
 
@@ -36,18 +40,23 @@ use Gcis::Client;
 use Data::Dumper;
 use Mojo::Util qw/html_unescape/;
 use Getopt::Long qw/GetOptions/;
+use Text::CSV;
+use Utils;
 
 use v5.16;
 
 GetOptions(
   'url=s'      => \(my $url),
   'dois=s'     => \(my $doi_file),
+  'csv=s'      => \(my $csv_file),
 ) or die "bad opts";
 
 die 'missing url' unless $url;
 die 'missing doi file' unless $doi_file;
+die 'missing csv file' unless $csv_file;
 warn "url      : $url\n";
 warn "doi file : $doi_file\n";
+warn "csv file : $csv_file\n";
 
 my $gcis  = Gcis::Client->connect(url => $url);
 my $orcid = Gcis::Client->new->url("http://pub.orcid.org")->accept("application/orcid+json");
@@ -128,13 +137,99 @@ sub load_doi_file {
     return \@article_dois
 }
 
+sub print_to_CSV {
+    my ($data) = @_;
+
+    my @data_for_print = ();
+
+    my @keys = keys %{ $data->[0] };
+
+    push @keys, "confirm_match";
+    push @keys, "organization_id";
+    push @keys, "person_url";
+
+    #print Dumper \@keys;
+    push @data_for_print, \@keys;
+
+    for my $person ( @{$data} ) {
+        my @row;
+        push @row, $person->{$_} foreach @keys;
+        push @data_for_print, \@row;
+    }
+
+    #print Dumper \@data_for_print;
+    my $csv = Text::CSV->new ( { binary => 1 } )  # should set binary attribute.
+                    or die "Cannot use CSV: ".Text::CSV->error_diag ();
+    $csv->eol ("\r\n");
+    open my $fh, ">:encoding(utf8)", $csv_file or die "new.csv: $!";
+    $csv->print ($fh, $_) for @data_for_print;
+    close $fh or die "new.csv: $!";
+
+    return;
+}
+
+sub get_person {
+    my ($entry) = @_;
+
+    # Query GCIS Search:
+    # # ORCid
+    # GET "/person/[ORCID]"
+    my $clean_orcid = Utils::url_escape($entry->{orcid});
+
+    print "Searching for person with $clean_orcid\n";
+    my $person = $gcis->get("/person/$clean_orcid");
+    if ( $person ) {
+        print "\tFound person $person->{id} via $clean_orcid\n";
+        return ($person, "ORCiD Matched");
+    }
+    # # First + Last
+    # GET "/person/[FIRST]-[LAST]"
+    my $clean_name = Utils::url_escape($entry->{first_name}) . "_" . Utils::url_escape($entry->{last_name});
+    print "Searching for person with $clean_name\n";
+    my $person = $gcis->get("/person/$clean_name");
+    if ( $person ) {
+        print "Found person $person->{id} via $clean_name\n";
+        return ($person, "Full Name Matched");
+    }
+
+    print "No person found\n";
+    return (undef, "No Match");
+}
+
 my $articles = load_doi_file();
 
+my $orcid_data;
 for my $doi ( @$articles ) {
     #print Dumper $article;
     #print "\n";
     my $data = get_orcid_authors($doi);
-    print Dumper $data;
+    foreach my $author ( @{$data} ) {
+        push @$orcid_data, $author;
+    }
+    #print Dumper $orcid_data;
     #my $doi = $article->{doi} or next;
     #my $some = get_orcid_authors($doi);
 }
+
+my $all_data;
+for my $entry ( @$orcid_data ) {
+
+    my ($person, $match_method) = get_person($entry);
+
+    if ( $person ) {
+        print "Adding person to entry: $person->{id} matched via $match_method\n";
+        $entry->{person_id} = $person->{id};
+        $entry->{match_method} = $match_method;
+    }
+    else {
+        $entry->{person_id} = '';
+        $entry->{match_method} = '';
+    }
+    #print Dumper $entry;
+    push @$all_data, $entry;
+
+    # Person_ID - the Person id returned from the GCIS matching
+    # Match Method - "ORCiD Match", "Full Name Match", "Last Name Match", "No Match", ...
+}
+
+print_to_CSV($all_data);
