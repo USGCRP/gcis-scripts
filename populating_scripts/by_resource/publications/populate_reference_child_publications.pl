@@ -16,7 +16,8 @@ added. The existing publication is linked to the reference.
 is valid and in 'crossref.org'. It's data is preferred for the new resource
 created.
 
-Note: Only Articles, Reports and Web Pages are currently implemented.
+Note: Only Articles, Reports and Web Pages are currently implemented. Articles
+also create their journal, if needed.
 
 =head1 SYNOPSIS
 
@@ -44,7 +45,7 @@ Time to wait between GCIS updates (seconds; defaults to -1 - do not wait)
 
 =item B<--qa_file>
 
-QA file (csv) - will contain the URIs for each reference processed
+QA file (yml) - will contain the information for each reference processed
 
 =item B<--verbose>
 
@@ -58,8 +59,8 @@ Dry run option
 
 =head1 EXAMPLES
 
-./populate_reference_child_publications.pl -u http://data-stage.globalchange.gov 
-                    -e references.xml
+./populate_reference_child_publications.pl -u http://data-stage.globalchange.gov \
+                    -r references.xml -q qa_file.yml
 
 =cut
 
@@ -99,16 +100,6 @@ pod2usage(msg => "missing url or reference file", verbose => 1) unless ($url && 
 
 ## Data Maps
 
-# to delete.
-my %DO_NOT_ADD = (
-    journals   => 0,
-    references => 0,
-    report     => 0,
-    webpage    => 0,
-    article    => 0,
-    journal    => 0,
-);
-
 # Reference Type to GCIS Type
 my %TYPE_MAP = (
 #   'Book' => 'book',
@@ -128,92 +119,6 @@ my %TYPE_MAP = (
    'Press Release' => 'generic_press', 
    'Aggregated Database' => 'generic_aggregateDB',
 );
-
-# type => { EndNote_Key => "GCIS Reference Key" }
-my $BIB_TYPE_KEY_MAP = {
-    article => {
-        'Date Published' => 'Date',
-        'Publisher' => '.publisher',
-        'Publication Title' => undef,
-        'Secondary Title' => 'Journal', 
-        'ISBN' => undef, 
-    },
-    edited_book => {
-        'Issue' => 'Edition',
-        'Pages' => 'Number of Pages',
-        'Author' => 'Editor',
-    },
-    book => {
-        'Issue' => 'Edition', 
-        'Pages' => 'Number of Pages',
-        'Secondary Author' => 'Editor', 
-    },
-    book_section => {
-        'Secondary Title' => 'Book Title', 
-        'Issue' => 'Edition',
-        'Secondary Author' => 'Editor',
-    },
-    generic_legal => {
-    },
-    generic_press => {
-    },
-    generic_media => {
-        'Secondary Title' => 'Periodical Title', 
-        'Date' => 'E-Pub Date', 
-    },
-    generic_cpaper => {
-        'Place Published' => 'Conference Location', 
-        'Secondary Title' => 'Conference Name', 
-        'Year' => 'Year of Conference',
-    },
-    report => {
-        'Issue' => 'Number', 
-    },
-    webpage => {
-        'Issue' => 'Number', 
-    },
-};
-
-my %REF_TYPE_NUM = (
-   article => 0,
-   book => 9,
-   edited_book => 9,
-   book_section => 7,
-   generic_legal => 32,
-   generic_press => 63,
-   generic_media => 48,
-   generic_cpaper => 47,
-   report => 10,
-   webpage => 16,
-);
-
-# EndNote references key to GCIS Reference key
-my %BIB_MAP = (
-    abstract            => 'Abstract',
-    doi                 => 'DOI',
-    isbn                => 'ISBN',
-    issn                => 'ISSN', 
-    language            => 'Language',
-    notes               => 'Notes',
-    number              => 'Issue',
-    pages               => 'Pages',
-    pub_dates           => 'Date Published',
-    pub_location        => 'Place Published',
-    publisher           => 'Publisher',
-    record_number       => '_record_number',
-    ref_key             => '_uuid',
-    reftype             => 'reftype',
-    reftype_id          => '.reference_type',
-    urls                => 'URL', 
-    volume              => 'Volume',
-    year                => 'Year',
-    author              => 'Author',
-    keywords            => 'Keywords',
-    secondary_author    => 'Secondary Author',
-    secondary_title     => 'Secondary Title',
-    pub_title           => 'Publication Title', 
-);
-
 
 my %QAS;
 my $N_UPDATES = 0;
@@ -386,14 +291,6 @@ sub find_existing_gcis_resource {
         ($resource_gcis, $matched_on) = _find_resource($gcis_handle, $gcis_type, (lc $search_field), $reference->{$search_field});
         last if $resource_gcis;
     }
-    #for my $max_char (-1, 60, 40, 30) {
-    #my $id = make_identifier($reference->{Title}, $max_char);
-    #$resource_gcis = $gcis_handle->get("/$gcis_type/$id");
-    #if ($resource_gcis){
-    #$matched_on = "Matched identifier at limited length: $max_char";
-    #last;
-    #}
-    #}
 
     # Kill bad matches with Differing DOIs
     if ($reference->{DOI} && $resource_gcis->{doi}) {
@@ -404,232 +301,6 @@ sub find_existing_gcis_resource {
 
     return $resource_gcis ? ($resource_gcis->{uri}, $matched_on) : undef;
 }
-
-# 
-# sub import_article {
-#     my $import_args = shift;
-# 
-#     my $gcis_handle = $import_args->{gcis};
-#     my $errata      = $import_args->{errata};
-#     my $ref_handler = $import_args->{ref};
-#     my $article;
-# 
-#     say " ---";
-#     $STATS{n_article}++;
-# 
-#     # Pull article information out of the EndNote reference
-#     # To build the Article Resource
-#     $article->{title} = xml_unescape(join ' ', @{ $ref_handler->{title} }) or do {
-#         say " ERROR: no title! : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
-#         $STATS{no_title}++;
-#         return 0;
-#     };
-#     for ($article->{title}) {
-#         s/\(\s+/\(/g;  s/\s+\)/\)/g;
-#     }
-# 
-#     my $article_key_map = {
-#         urls   => 'url',
-#         doi    => 'doi', 
-#         year   => 'year',
-#         volume => 'journal_vol',
-#         pages  => 'journal_pages',
-#     };
-#     for (keys %{ $article_key_map }) {
-#         next unless $ref_handler->{$_};
-#         $article->{$article_key_map->{$_}} = $ref_handler->{$_}[0];
-#     }
-#     $article->{author} = xml_unescape(join '; ', @{ $ref_handler->{author} });
-# 
-#     # break out any Key-Value pairs noted as alternate ids
-#     fix_alt_id($import_args->{alt_ids}, \%{ $article });
-# 
-#     # Clean up our External Identifiers
-#     if ($article->{doi}) {
-#         fix_doi($errata, $article);
-#     } elsif (!$article->{pmid}) {
-#         $article->{pmid} = PubMed::alt_id($article->{url}, $ref_handler->{pages}[0]) or do
-#         {
-#             say " WARN: no doi or alternate id : $article->{title} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
-#             $STATS{no_doi_or_alternate_id}++;
-#         };
-#     }
-# 
-#     # Load external versions of the article, if they exist
-#     my $external_article;
-#     my $check_external = 0;
-#     if ($article->{doi}) {
-#         my $crossref_handle = CrossRef->new;
-#         $external_article = $crossref_handle->get($article->{doi});
-#         if (!$external_article) {
-#             say " WARN: doi not in crossref : $article->{doi} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
-#             $STATS{doi_not_in_crossref}++;
-#        } else {
-#             $check_external = 1;
-#             $article->{identifier} = $article->{doi};
-#        }
-#     } elsif ($article->{pmid}) {
-#        my $pubMed_handle = PubMed->new;
-#        $external_article = $pubMed_handle->get($article->{pmid}); 
-#        if (!$external_article) {
-#            say " WARN: id not in pubmed : $article->{pmid}\n   for : $article->{title} : $ref_handler->{record_number}[0] : $ref_handler->{ref_key}[0]";
-#            $STATS{id_not_in_pubmed}++;
-#        } else {
-#            $check_external = 1;
-#            $article->{identifier} = 'pmid-'.$external_article->{pmid};
-#            $article->{pmid} = $external_article->{pmid};
-#        }
-#     }
-#     # Fallback on the GCIS version of the article
-#     if (!$external_article) {
-#        $external_article = get_item($gcis_handle, 'article', $article);
-#     }
-# 
-#     $article->{uri} = "/article/$article->{identifier}";
-#     #my $uri = $article->{uri};# or return 0;
-#     #say "DEBUG: Found A Resourse URI";
-#     #my $uri_errata = $errata->{e}->{$uri} ;#or return 1;
-#     #for (@{ $uri_errata }) {
-#     #    say "Fixing Errata! Here's the _ for array { i }:";
-#     #    say Dumper $_;
-#     #    $errata->_fix_items($_, $article);
-#     #}
-# 
-#     say " art :\n".Dumper($article) if $verbose;
-# 
-#     # Assert the article matches the external
-#     if ($check_external) {
-#         my $ignored = $errata->diff_okay($article);
-#         $ignored->{$_} = 1 for qw(uri identifier journal_identifier url);
-#         my $difference = compare_hash($article, $external_article, $ignored);
-#         if ($difference) {
-#             add_to_diff($article->{uri}, $difference);
-#             say " NOTE: external source article different : $article->{uri}";
-#             print " DEBUG ";
-#             print Dumper $difference;
-#             $STATS{external_source_article_different}++;
-#            return 0; # TODO Should this really return...?
-#         }
-#     }
-# 
-#     # Handle Updating or Adding the article
-#     my $articleGCIS = $gcis_handle->get($article->{uri});
-#     if ($articleGCIS) {
-#         update_existing_resource(
-#           existing    => $articleGCIS,
-#           new         => $article,
-#           errata      => $errata,
-#           gcis_handle => $gcis_handle,
-#           type        => 'article',
-#         );
-#     } elsif (!$DO_NOT_ADD{article} ) {
-#        add_item($gcis_handle, $article) or return 0;
-#     } else {
-#        return 0;
-#     }
-# 
-#     # Creating the Reference
-#     my $article_reference;
-#     $article_reference->{identifier} = $ref_handler->{ref_key}[0];
-#     $article_reference->{uri} = "/reference/$article_reference->{identifier}";
-#     my $reference_attrs = \%{ $article_reference->{attrs} };
-# 
-#     # clean up the attr keys
-#     ## general key name mapping
-#     map_attrs($ref_handler, $reference_attrs);
-# 
-#     ## kill extraneous fields
-#     for ('Publication Title', 'Secondary Title', 'ISBN') {
-#         next unless $reference_attrs->{$_};
-#         delete $reference_attrs->{$_};
-#     }
-# 
-#     ## article-specific key name mapping
-#     my $extra_map = {
-#         'Date Published' => 'Date',
-#         'Publisher' => '.publisher',
-#     };
-#     for (keys %{ $extra_map }) {
-#         next unless $reference_attrs->{$_};
-#         $reference_attrs->{$extra_map->{$_}} = $reference_attrs->{$_};
-#         delete $reference_attrs->{$_};
-#     }
-# 
-#     # Overwrite these fields with the endnote values, but gcis keys
-#     my $article_field_map = {
-#         author        => 'Author', 
-#         title         => 'Title', 
-#         url           => 'URL',
-#         doi           => 'DOI',
-#         journal_pages => 'Pages', 
-#         journal_vol   => 'Volume',
-#         year          => 'Year', 
-#         pmid          => 'PMID', 
-#     };
-#     foreach my $endnote_key (keys %{ $article_field_map }) {
-#         my $gcis_key = $article_field_map->{$endnote_key};
-#         if (!defined $article->{$endnote_key}) {
-#             next unless $reference_attrs->{$gcis_key};
-#             delete $reference_attrs->{$gcis_key};
-#             next;
-#         }
-#         $reference_attrs->{$gcis_key} = $article->{$endnote_key};
-#     }
-# 
-#     # Add extra attrs and fix errata TODO
-#     $reference_attrs->{'.reference_type'} = 0;
-#     $reference_attrs->{ISSN} = $journal->{online_issn} ? $journal->{online_issn} : $journal->{print_issn};
-#     $reference_attrs->{Journal} = $journal->{title};
-# 
-#     $errata->fix_errata($article_reference);
-# 
-#     say " bib :\n".Dumper($article_reference) if $verbose;
-# 
-#     #push @QAS, $article_reference->{uri};
-#     # Update or Add the reference
-#     # Handle the DIFF issues in the update
-#     my $existing_gcis_ref = $gcis_handle->get($article_reference->{uri});
-#     if ($existing_gcis_ref) {
-#         fix_bib_issn($reference_attrs, $existing_gcis_ref->{attrs}, $journal);
-#         my $ignored = $errata->diff_okay($article_reference);
-#         $ignored->{_record_number} = 1;
-#         my $difference = compare_hash($article_reference, $existing_gcis_ref, $ignored);
-#             print " DEBUG ";
-#             print Dumper $difference;
-#         if ($difference) {
-#             say " NOTE: existing reference different : $article_reference->{uri}";
-#             $STATS{existing_reference_different}++;
-#             if (can_fix_item($difference)  ) {
-#                 say " NOTE: can fix reference: $article_reference->{uri}";
-#                 $STATS{"can_fix_reference"}++;
-#                 fix_item($article_reference, $existing_gcis_ref, $ignored);
-#                 my $fixed_diff = compare_hash($article_reference, $existing_gcis_ref, $ignored);
-#                 !$fixed_diff or die "didn't fix reference!";
-#                 update_item($gcis_handle, $existing_gcis_ref);
-#                 return 0 if $DO_NOT_ADD{ references }  ||
-#                             $existing_gcis_ref->{child_publication};
-#             } else {
-#                 add_to_diff($article_reference->{uri}, $difference);
-#                 return 0;
-#             }
-#         } else {
-#             say " NOTE: existing reference same : $article_reference->{uri}";
-#             $STATS{existing_reference_same}++;
-#             return 0 if $DO_NOT_ADD{ references }  ||  
-#                         $existing_gcis_ref->{child_publication};
-#         }
-#     } elsif (!$DO_NOT_ADD{ references }) {
-#         add_item($gcis_handle, $article_reference) or return 0;
-#     } else {
-#         return 0;
-#     }
-# 
-#     # Connect the child publication
-#     $article_reference->{child_publication_uri} = $article->{uri};
-#     add_child_pub($gcis_handle, $article_reference) or return 0;
-# 
-#     return 1;
-# }
 
 sub import_journal_from_article {
     my %args = @_;
@@ -654,25 +325,25 @@ sub import_journal_from_article {
         $journal->{print_issn}  = $reference->{ISSN};
     }
     # Pull any matching existing GCIS Journal
-    my ($existing_journal, $matched_on) = find_existing_gcis_resource($gcis_handle, 'journal', $journal);
+    my ($existing_journal_uri, $matched_on) = find_existing_gcis_resource($gcis_handle, 'journal', $journal);
 
     # Ensure we have some unique identifier for the Journal
-    if ( ! $existing_journal && ! $journal->{print_issn} ) {
+    if ( ! $existing_journal_uri && ! $journal->{print_issn} ) {
         die " ERROR: no journal issn : $journal->{uri} : $reference->{uri}";
     }
 
 
-    if ( ! $existing_journal ) {
+    if ( ! $existing_journal_uri ) {
         $journal->{identifier} = make_identifier($journal->{title}) unless $journal->{identifier};
         $journal->{uri} = "/journal/$journal->{identifier}";
         my $journal_uri = create_resource_in_gcis($gcis_handle, $journal);
-        return $journal_uri;
+        return $journal->{identifier};
     }
     else {
-        return $existing_journal;
+        my ($identifier) = $existing_journal_uri =~ m</[^/]+/(.*)>;
+        return $identifier;
     }
 }
-
 
 sub build_resource {
     my %import_args = @_;
@@ -683,9 +354,6 @@ sub build_resource {
     my $resource;
 
     $STATS{"n_$type"}++;
-
-    # Data pull.
-    # Should get out: Title
 
     $resource->{title} = $reference->{Title};
 
