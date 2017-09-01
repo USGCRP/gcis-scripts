@@ -13,7 +13,8 @@ If a matching publication already exists in GCIS, a new publication is not
 added. The existing publication is linked to the reference.
 
 'crossref.org' is used to obtain some information for articles, if the doi
-is valid and in 'crossref.org'. It's data is preferred for the new resource
+is valid and in 'crossref.org'. PubMed ID is checked if the article URL matches
+PubMed article types. CrossRef and PubMed data are preferred for the new resource
 created.
 
 Note: Only Articles, Reports and Web Pages are currently implemented. Articles
@@ -176,7 +177,7 @@ sub create_resource_in_gcis {
         #say " NOTE: would add $new_resource_path : $new_resource_uri";
         $N_UPDATES++;
         $STATS{"would_add_$new_resource_path"}++;
-        return 1;
+        return $new_resource->{uri};
     }
 
     #say " adding $new_resource_path : $new_resource_uri";
@@ -225,7 +226,7 @@ sub connect_reference_and_child {
 sub _find_resource {
     my ($gcis_handle, $gcis_type, $search_field, $search_value) = @_;
 
-    say "Searching type $gcis_type, field $search_field, for value $search_value";
+    #say "Searching type $gcis_type, field $search_field, for value $search_value";
     my $search_value_formatted = $search_value;
     $search_value_formatted = Utils::url_unescape($search_value_formatted) if $search_field eq 'url';
     if ($search_field eq 'title') {
@@ -309,10 +310,11 @@ sub import_journal_from_article {
     my $article          = $args{article};
     my $external_article = $args{external_article};
     my $gcis_handle      = $args{gcis_handle};
+    my $ref_data         = $reference->{attrs};
 
     # Build the Journal Resource
     my $journal;
-    $journal->{title} = $reference->{Journal} or do {
+    $journal->{title} = $ref_data->{Journal} or do {
         die " ERROR: no journal title : $article->{identifier} : $reference->{uri}";
     };
 
@@ -322,7 +324,7 @@ sub import_journal_from_article {
         $journal->{publisher}   = $external_article->{publisher};
     }
     else {
-        $journal->{print_issn}  = $reference->{ISSN};
+        $journal->{print_issn}  = $ref_data->{ISSN};
     }
     # Pull any matching existing GCIS Journal
     my ($existing_journal_uri, $matched_on) = find_existing_gcis_resource($gcis_handle, 'journal', $journal);
@@ -332,30 +334,46 @@ sub import_journal_from_article {
         die " ERROR: no journal issn : $journal->{uri} : $reference->{uri}";
     }
 
-
+    my ($journal_identifier, $action);
     if ( ! $existing_journal_uri ) {
         $journal->{identifier} = make_identifier($journal->{title}) unless $journal->{identifier};
         $journal->{uri} = "/journal/$journal->{identifier}";
-        my $journal_uri = create_resource_in_gcis($gcis_handle, $journal);
-        return $journal->{identifier};
+        print "         " . ( $dry_run ? "(DRYRUN) " : "") . "Creating new journal $journal->{uri}\n";
+        $action = "Creating and linking journal to article.";
+        create_resource_in_gcis($gcis_handle, $journal);
+        $journal_identifier = $journal->{identifier};
     }
     else {
         my ($identifier) = $existing_journal_uri =~ m</[^/]+/(.*)>;
-        return $identifier;
+        print "         " . ( $dry_run ? "(DRYRUN) " : "") . "Found journal $existing_journal_uri\n";
+        $action = "Linking existing journal to article.";
+        $journal_identifier = $identifier;
     }
+
+    # QA out
+    create_qa_entry(
+        reference         => $reference,
+        child_publication => $journal_identifier,
+        gcis_type         => 'journal',
+        ref_type          => $reference->{attrs}{reftype},
+        action            => $action,
+    );
+
+    return $journal_identifier;
 }
 
 sub build_resource {
     my %import_args = @_;
 
     my $gcis_handle = $import_args{gcis};
-    my $reference   = $import_args{ref_data};
+    my $reference   = $import_args{reference};
     my $type        = $import_args{gcis_type};
     my $resource;
+    my $ref_data = $reference->{attrs};
 
     $STATS{"n_$type"}++;
 
-    $resource->{title} = $reference->{Title};
+    $resource->{title} = $ref_data->{Title};
 
     my $resource_key_map = {
         webpage => {
@@ -379,8 +397,8 @@ sub build_resource {
 
     my $this_resource_key_map = $resource_key_map->{$type} or die "type missing key_map: $type";
     for (keys %{ $this_resource_key_map }) {
-        next unless $reference->{$_};
-        $resource->{$this_resource_key_map->{$_}} = $reference->{$_};
+        next unless $ref_data->{$_};
+        $resource->{$this_resource_key_map->{$_}} = $ref_data->{$_};
     }
 
     # cleanup access date
@@ -403,35 +421,24 @@ sub build_resource {
             $resource->{identifier } = $resource->{doi}
         }
 
-        my $external_article;
         # TODO - load articles from CrossRef; PubMed. Populate data from there.
         # Load external versions of the article, if they exist
-        #my $article = $resource;
-        #my $external_article;
-        #my $check_external = 0;
-        #if ($article->{doi}) {
-        #    my $crossref_handle = CrossRef->new;
-        #    $external_article = $crossref_handle->get($article->{doi});
-        #    if (!$external_article) {
-        #        say "\t\t\tDOI not in crossref : $article->{doi} : $article->{title} : $reference->{uri}";
-        #        $STATS{doi_not_in_crossref}++;
-        #   } else {
-        #        $check_external = 1;
-        #        $article->{identifier} = $article->{doi};
-        #   }
-        #} elsif ( $article->{pmid} = PubMed::alt_id($article->{url}, $reference->{Pages}) ) {
-        #   my $pubMed_handle = PubMed->new;
-        #   $external_article = $pubMed_handle->get($article->{pmid});
-        #   if (!$external_article) {
-        #       say "\t\t\tPubMed ID not in pubmed : $article->{pmid} : $article->{title} : $reference->{uri}";
-        #       $STATS{id_not_in_pubmed}++;
-        #   } else {
-        #       $check_external = 1;
-        #       $article->{identifier} = 'pmid-'.$external_article->{pmid};
-        #       $article->{pmid} = $external_article->{pmid};
-        #   }
-        #}
-        #
+        my $external_article;
+        if ($resource->{doi}) {
+            $resource->{identifier} = $resource->{doi};
+            my $crossref_handle = CrossRef->new;
+            $external_article = $crossref_handle->get($resource->{doi});
+            if ($external_article) {
+               source_external_info($resource, $external_article);
+            }
+        } elsif ( my $pmid = PubMed::alt_id($resource->{url}, $ref_data->{Pages}) ) {
+            my $pubMed_handle = PubMed->new;
+            $external_article = $pubMed_handle->get($pmid);
+            if ($external_article) {
+                $resource->{identifier} = 'pmid-'.$external_article->{pmid};
+                #print "pm id: $resource->{identifier}\n"
+            }
+        }
 
         $resource->{journal_identifier} = import_journal_from_article(
             reference        => $reference,
@@ -447,6 +454,17 @@ sub build_resource {
     return $resource;
 }
 
+# We prefer the title, year, journal volume and journal pages from CrossRef, rather
+# than the specification in the reference
+
+sub source_external_info {
+    my ($existing, $external) = @_;
+    for my $field ( qw(title journal_vol journal_pages title) ) {
+        $existing->{$field} = $external->{field} if $external->{field};
+    }
+    return;
+}
+
 # reference import_other
 sub populate_child_publication {
     my %args = @_;
@@ -459,27 +477,27 @@ sub populate_child_publication {
     my ($existing_publication, $matched_on) =
             find_existing_gcis_resource($gcis, $gcis_type, $reference->{attrs});
     if ( $existing_publication ) {
-        print "\t\tFound existing publication '$existing_publication'. $matched_on\n";
+        print "      Found existing publication '$existing_publication'. $matched_on\n";
         $child_pub = $existing_publication;
         $action = "Found & linked existing publication. $matched_on";
     }
     else {
         # create the publication - info grab from crossref
-        print "\t\t" . ( $dry_run ? "(DRYRUN) " : "") . "Creating new publication\n";
+        print "      " . ( $dry_run ? "(DRYRUN) " : "") . "Creating new publication\n";
         my $resource_data = build_resource(
-            ref_data  => $reference->{attrs},
+            reference => $reference,
             gcis_type => $gcis_type,
             gcis      => $gcis,
         );
 
         $child_pub = create_resource_in_gcis( $gcis, $resource_data);
         $action = "Created & linked publication.";
-        print "\t\t" . ( $dry_run ? "(DRYRUN) " : "") . "Created publication: $child_pub\n";
+        print "      " . ( $dry_run ? "(DRYRUN) " : "") . "Created publication: $child_pub\n";
     }
 
     # link the reference and the child publication
     connect_reference_and_child($gcis, $reference->{uri}, $child_pub);
-    print "\t\t" . ( $dry_run ? "(DRYRUN) " : "") . "Linked reference ($reference->{uri}) and child publication ($child_pub)\n";
+    print "      " . ( $dry_run ? "(DRYRUN) " : "") . "Linked reference ($reference->{uri}) and child publication ($child_pub)\n";
     # QA out
     create_qa_entry(
         reference         => $reference,
@@ -579,7 +597,7 @@ sub main {
         my $type = $TYPE_MAP{$ref_type} // '';
 
         if ( $reference->{child_publication} ) {
-            print "\tReference already has child pub $reference->{child_publication}\n";
+            print "   Reference already has child pub $reference->{child_publication}\n";
             $STATS{reference_has_child_pub}++;
             create_qa_entry(
                 reference => $reference,
@@ -590,7 +608,7 @@ sub main {
             );
         }
         elsif ( ! $type ) {
-            print "\tReference type $ref_type has no GCIS type mapping\n";
+            print "   Reference type $ref_type has no GCIS type mapping\n";
             $STATS{reference_type_unknown}++;
             create_qa_entry(
                 reference => $reference,
@@ -600,7 +618,7 @@ sub main {
             );
         }
         elsif ( $types_to_process{ $type } ) {
-            print "\tHandling child publication for reference: $reference->{attrs}{Title}\n";
+            print "   Handling child publication for reference: $reference->{attrs}{Title}\n";
             populate_child_publication(
                 reference => $reference,
                 gcis_type => $type,
@@ -609,7 +627,7 @@ sub main {
             );
         }
         else {
-            print "\tReference type $ref_type ($type) is not handled in this script.\n";
+            print "   Reference type $ref_type ($type) is not handled in this script.\n";
             $STATS{reference_type_not_automated}++;
             $STATS{"n_$type"}++;
             create_qa_entry(
