@@ -19,7 +19,7 @@ the differences yml file.
 
 If a matching entry already exists in GCIS, the new entry is not added.
 
-An errata file may be used to ignore differences between the GCIS (or crossref)
+An errata file may be used to ignore differences between the GCIS
 entry and the EndNote file.  This allows for the new entry obtained from 
 EndNote to be different from the information stored in GCIS (the GCIS 
 information is not changed). The diff can be fed back in for this purpose.
@@ -72,6 +72,11 @@ entry and an existing GCIS entry
 
 References file (csv) - will contain the URIs for each reference
 processed - be they created, differing, or preexisting.
+
+=item B<--uuid_generation>
+
+If the EndNote is missing UUIDs, go ahead and generate them. For the moment,
+this should only be used for test runs. Find UUID generation belongs to TSU.
 
 =item B<--verbose>
 
@@ -135,6 +140,7 @@ GetOptions(
     'references_file=s'     => \(my $references_file),
     'verbose'               => \(my $verbose),
     'dry_run|n'             => \(my $dry_run),
+    'uuid_generation'       => \(my $uuid_gen),
     'help|?'                => sub { pod2usage(verbose => 2) },
 ) or die pod2usage(verbose => 1);
 
@@ -539,10 +545,16 @@ sub get_gcis_identifier {
     my $identifier = $endnote_record->{ref_key}[0];
     return $identifier if $identifier;
 
-    # no identifier found? generate one.
-    $identifier = $gcis->get('/uuid');
-    say "No EndNote UUID found; generated: $identifier->[0]";
-    return $identifier->[0] if $identifier->[0];
+    if ( $uuid_gen ) {
+        # no identifier found? generate one.
+        $identifier = $gcis->get('/uuid');
+        say "No EndNote UUID found; generated: $identifier->[0]";
+        return $identifier->[0] if $identifier->[0];
+    }
+    else {
+        warn Dumper $endnote_record;
+        exit "EndNote Entry missing UUID!";
+    }
 }
 
 sub create_bib_data {
