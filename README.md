@@ -14,8 +14,8 @@ Many scripts in this collection are copied and pasted from each other and other 
  - Add the libs to `PERL5LIB`  
    `echo export PERL5LIB=$PERL5LIB:~/repos/gcis-pl-client/lib/:~/repos/gcis-scripts/lib/ >>~/.bashrc`
  - Install Perlbrew and the perl version  
-   `\curl -L https://install.perlbrew.pl | bash` 
-   `echo "source ~/perl5/perlbrew/etc/bashrc" >>~/.bashrc`
+   `\curl -L https://install.perlbrew.pl | bash`   
+   `echo "source ~/perl5/perlbrew/etc/bashrc" >>~/.bashrc`  
    `perlbrew install perl-5.20.3` #long running  
    `perlbrew switch perl-5.20.3`
  - Install Mojolicious  
