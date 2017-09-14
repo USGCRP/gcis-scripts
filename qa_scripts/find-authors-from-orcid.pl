@@ -28,6 +28,10 @@ The file containing the DOIs to query
 
 The file to print the output to
 
+=item B<--verbose>
+
+Verbose output
+
 =back
 
 =head1 EXAMPLES
@@ -49,6 +53,7 @@ GetOptions(
   'url=s'      => \(my $url),
   'dois=s'     => \(my $doi_file),
   'csv=s'      => \(my $csv_file),
+  'verbose!'   => \(my $verbose),
 ) or die "bad opts";
 
 die 'missing url' unless $url;
@@ -72,8 +77,8 @@ sub get_orcid_authors {
         #my $q = $orcid->tx->res->json("/orcid-search-results/orcid-search-result/$_/orcid-profile");
         #print Dumper $q;
         push @authors, {
-              last_name  => html_unescape($p->{'family-name'}{'value'}),
-              first_name => html_unescape($p->{'given-names'}{'value'}),
+              last_name  => html_unescape($p->{'family-name'}{'value'} // ''),
+              first_name => html_unescape($p->{'given-names'}{'value'} // ''),
               orcid      => $id,
               doi        => $doi,
         };
@@ -147,6 +152,11 @@ sub print_to_CSV {
     push @keys, "confirm_match";
     push @keys, "organization_id";
     push @keys, "person_url";
+    push @keys, "org_name";
+    push @keys, "org_type";
+    push @keys, "org_url";
+    push @keys, "org_country_code";
+    push @keys, "org_international_flag";
 
     #print Dumper \@keys;
     push @data_for_print, \@keys;
@@ -176,29 +186,32 @@ sub get_person {
     # GET "/person/[ORCID]"
     my $clean_orcid = Utils::url_escape($entry->{orcid});
 
-    print "Searching for person with $clean_orcid\n";
+    print "Searching for person with $clean_orcid\n" if $verbose;
     my $person = $gcis->get("/person/$clean_orcid");
     if ( $person ) {
-        print "\tFound person $person->{id} via $clean_orcid\n";
+        print "\tFound person $person->{id} via $clean_orcid\n" if $verbose;
         return ($person, "ORCiD Matched");
     }
     # # First + Last
     # GET "/person/[FIRST]-[LAST]"
     my $clean_name = Utils::url_escape($entry->{first_name}) . "_" . Utils::url_escape($entry->{last_name});
-    print "Searching for person with $clean_name\n";
+    print "Searching for person with $clean_name\n" if $verbose;
     my $person = $gcis->get("/person/$clean_name");
     if ( $person ) {
-        print "Found person $person->{id} via $clean_name\n";
+        print "Found person $person->{id} via $clean_name\n" if $verbose;
         return ($person, "Full Name Matched");
     }
 
-    print "No person found\n";
+    print "No person found\n" if $verbose;
     return (undef, "No Match");
 }
 
 my $articles = load_doi_file();
 
+say "Processing " . @$articles . " DOIs.\nShould take about " . 0.15 * @$articles / 60 . " minutes to run this first process.";
+
 my $orcid_data;
+say "Pulling data from DOI";
 for my $doi ( @$articles ) {
     #print Dumper $article;
     #print "\n";
@@ -210,14 +223,16 @@ for my $doi ( @$articles ) {
     #my $doi = $article->{doi} or next;
     #my $some = get_orcid_authors($doi);
 }
+say "";
 
+say "Found " . @$orcid_data . " ORCiD entries to check against GCIS.\nShould take about " . 0.15 * @$orcid_data / 60 . " minutes to run this last process.";
 my $all_data;
 for my $entry ( @$orcid_data ) {
 
     my ($person, $match_method) = get_person($entry);
 
     if ( $person ) {
-        print "Adding person to entry: $person->{id} matched via $match_method\n";
+        print "Adding person to entry: $person->{id} matched via $match_method\n" if $verbose;
         $entry->{person_id} = $person->{id};
         $entry->{match_method} = $match_method;
     }
