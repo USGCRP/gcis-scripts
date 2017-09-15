@@ -54,6 +54,7 @@ GetOptions(
   'dois=s'     => \(my $doi_file),
   'csv=s'      => \(my $csv_file),
   'verbose!'   => \(my $verbose),
+  'debug!'   => \(my $debug),
 ) or die "bad opts";
 
 die 'missing url' unless $url;
@@ -171,7 +172,7 @@ sub print_to_CSV {
     my $csv = Text::CSV->new ( { binary => 1 } )  # should set binary attribute.
                     or die "Cannot use CSV: ".Text::CSV->error_diag ();
     $csv->eol ("\r\n");
-    open my $fh, ">:encoding(utf8)", $csv_file or die "new.csv: $!";
+    open my $fh, ">:encoding(utf8)", $csv_file or die "$csv_file: $!";
     $csv->print ($fh, $_) for @data_for_print;
     close $fh or die "new.csv: $!";
 
@@ -181,28 +182,30 @@ sub print_to_CSV {
 sub get_person {
     my ($entry) = @_;
 
+    return (undef, "No Match") unless $entry->{orcid};
     # Query GCIS Search:
     # # ORCid
     # GET "/person/[ORCID]"
     my $clean_orcid = Utils::url_escape($entry->{orcid});
 
-    print "Searching for person with $clean_orcid\n" if $verbose;
+    print "\tSearching for person with $clean_orcid\n" if $verbose;
     my $person = $gcis->get("/person/$clean_orcid");
     if ( $person ) {
-        print "\tFound person $person->{id} via $clean_orcid\n" if $verbose;
+        print "\t\tFound person $person->{id} via $clean_orcid\n" if $verbose;
         return ($person, "ORCiD Matched");
     }
     # # First + Last
     # GET "/person/[FIRST]-[LAST]"
+    return (undef, "No Match") unless ($entry->{first_name} && $entry->{last_name});
     my $clean_name = Utils::url_escape($entry->{first_name}) . "_" . Utils::url_escape($entry->{last_name});
     print "Searching for person with $clean_name\n" if $verbose;
     my $person = $gcis->get("/person/$clean_name");
     if ( $person ) {
-        print "Found person $person->{id} via $clean_name\n" if $verbose;
+        print "\t\tFound person $person->{id} via $clean_name\n" if $verbose;
         return ($person, "Full Name Matched");
     }
 
-    print "No person found\n" if $verbose;
+    print "\t\tNo person found\n" if $verbose;
     return (undef, "No Match");
 }
 
@@ -215,10 +218,12 @@ say "Pulling data from DOI";
 for my $doi ( @$articles ) {
     #print Dumper $article;
     #print "\n";
+    say "\tSearching for authors for $doi" if $verbose;
     my $data = get_orcid_authors($doi);
     foreach my $author ( @{$data} ) {
         push @$orcid_data, $author;
     }
+    if ( @$data && $verbose ) { say "\t\tFound authors." }
     #print Dumper $orcid_data;
     #my $doi = $article->{doi} or next;
     #my $some = get_orcid_authors($doi);
@@ -226,6 +231,13 @@ for my $doi ( @$articles ) {
 say "";
 
 say "Found " . @$orcid_data . " ORCiD entries to check against GCIS.\nShould take about " . 0.15 * @$orcid_data / 60 . " minutes to run this last process.";
+
+if ( $debug ) {
+    open my $fh, ">:encoding(utf8)", "found_authors.dump" or die "found_authors.dump $!";
+    print $fh Dumper @$orcid_data;
+    close $fh or die "$!";
+}
+
 my $all_data;
 for my $entry ( @$orcid_data ) {
 
@@ -246,5 +258,12 @@ for my $entry ( @$orcid_data ) {
     # Person_ID - the Person id returned from the GCIS matching
     # Match Method - "ORCiD Match", "Full Name Match", "Last Name Match", "No Match", ...
 }
+
+if ( $debug ) {
+    open my $fh, ">:encoding(utf8)", "all_data.dump" or die "all_data.dump $!";
+    print $fh Dumper @$all_data;
+    close $fh or die "$!";
+}
+
 
 print_to_CSV($all_data);
