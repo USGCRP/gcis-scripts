@@ -89,6 +89,7 @@ use Gcis::Client;
 use Data::Dumper;
 use Getopt::Long qw/GetOptions/;
 use Pod::Usage;
+use Try::Tiny;
 
 my %TYPES = (
     article => 1,
@@ -137,14 +138,23 @@ while ( $count > 0)
     for my $resource ( @$resources ) {
         my $resource_url = $resource->{url} ? $resource->{url} : "";
 
+        print "$resource->{href}\t$resource_url\t";
         my $code = "";
         my $redirect = "";
         if ( $resource_url ) {
-            my $res = $ua->get($resource_url)->result;
-            $code = $res->code;
-            $redirect = $res->headers->location if $code =~ /^3/;
+
+            my $res = try {
+                $ua->get($resource_url)->result;
+            };
+            if ( $res ) {
+                $code = $res->code;
+                $redirect = $res->headers->location if $code =~ /^3/;
+            }
+            else {
+                $code = "Error loading page";
+            }
         }
-        say "$resource->{href}\t$resource_url\t$code\t$redirect";
+        say "$code\t$redirect";
         $index++;
         sleep 1 unless $index % 5;
     }
