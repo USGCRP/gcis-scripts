@@ -62,6 +62,22 @@ while (<DATA>) {
             country_code                 => $existing->{country},
         }) or die $c->error;
     say "\t\tUpdated Name and ID";
+    if ( ! $org_name_fr ) {
+        say "\t\tNo alternate name";
+        next;
+    }
+    my $existing_alt_id = $c->get("/search.json?q=$org_id_en&type=organization_alternate_name");
+    if ( $existing_alt_id ) {
+        my $skip;
+        for my $result ( @$existing_alt_id ) {
+            if ( $result->{alternate_name} && $result->{alternate_name} eq $org_name_fr ) {
+                say "\t\tAlternate name already set";
+                $skip = 1;
+                last;
+            }
+        }
+        next if $skip;
+    }
     $c->post("/organization_alternate_name", {
                 organization_identifier => $org_id_en,
                 alternate_name          => $org_name_fr,
@@ -141,7 +157,6 @@ laboratoire-atmospheres-milieux-observations-spatiales : Laboratoire Atmosphère
 institu-national-des-sciences-de-lunivers : Institut National des Sciences de l'univers : fr : National Institute of Sciences of the Universe : national-institute-sciences-universe
 consejo-nacional-de-investigaciones-cientificas-y-tecnicas : Consejo Nacional de Investigaciones Científicas y Técnicas : es : National Council for Scientific and Technical Research : national-council-scientific-technical-research
 pontificia-universidad-catolica-argentina : Pontificia Universidad Católica Argentina : es : Pontifical Catholic University of Argentina : pontifical-catholic-university-argentina
-centro-investigacion-enfermedades-tropicales : Centro de Investigación en Enfermedades Tropicales : es : Center for Research on Tropical Diseases : center-research-tropical-diseases
 centre-europeen-de-recherche-formation-avancee-calcul-scientifique : Centre Européen de Recherche et de Formation Avancée en Calcul Scientifique : fr : European Centre for Research and Advanced Training in Scientific Computation : european-centre-research-advanced-training-scientific-computation
 universite-versailles-saint-quentin-en-yvelines : Université de Versailles Saint-Quentin-en-Yvelines : fr : Versailles Saint-Quentin-en-Yvelines University : versailles-saint-quentin-en-yvelines-university
 hospital-la-colombiere : Centre Hospitalier Universitaire de Montpellie : fr : the University Hospital of Montpellier : university-hospital-montpellier
@@ -206,5 +221,41 @@ laboratoire-doceanographie-de-villefranche-sur-mer : Laboratoire d'Océanographi
 universite-du-quebec-a-montreal-departement-des-sciences-biologiques : Université du Québec à Montréal Département des Sciences biologiques : fr : University of Quebec in Montreal Department of Biological Sciences : university-quebec-montreal-department-biological-sciences
 centrum-voor-estuariene-en-mariene-ecologie : Centrum voor Estuariene en Mariene Ecologie : nl : Centre for Estuarine and Marine Ecology : centre-estuarine-marine-ecology
 universitat-autonoma-de-barcelona-centre-de-estudis-avancats-de-blanes : Universitat Autònoma de Barcelona Centre d’Estudis Avançats de Blanes : es : Autonomous University of Barcelona Centre for Advanced Studies of Blanes : autonomous-university-barcelona-centre-advanced-studies-blanes
-consejo-superior-de-investigationes-cientificas-institute-marine-sciences : Consejo Superior de Investigationes Cientificas Institute of Marine Sciences : es : Higher Council for Scientific Research Institute of Marine Sciences : higher-council-scientific-research-institute-marine-sciences
-technische-universitat-munchen : Technische Universität München : de : Technical University of Munich : technical-university-munich
+centre-de-recherche-sur-les-ecosystemes-marins-et-aquacoles : Centre de Recherche Sur Les Ecosystemes Marins et Aquacoles : fr : Research Centre on Marine Ecosystems and Aquaculture : research-centre-on-marine-ecosystems-aquaculture
+centre-national-de-la-recherche-scientifique : Centre National de la Recherche Scientifique : fr : French National Center for Scientific Research : french-national-center-scientific-research
+universitat-kiel : Christian-Albrechts-Universität zu Kiel : de : University of Kiel : university-kiel
+cnrs-laboratoire-de-glaciologie-et-de-geophysique-de-lenvironnement : CNRS Laboratoire de Glaciologie et de Géophysique de l'Environnement : fr : Laboratory of Glaciology and Environmental Geophysics  : laboratory-glaciology-environmental-geophysics
+departamento-control-alimentos-ministerio-salud : Departamento Control de Alimentos Ministerio de Salud : es : Food Control Department Ministry of Health : food-control-department-ministry-health
+ecole-polytechnique-federale-lausanne : École Polytechnique Fédérale Lausanne : fr : Swiss Federal Institute of Technology in Lausanne : swiss-federal-institute-technology-lausanne
+ecole-polytechnique-federale-lausanne-school-architecture-civil-environmental-engineering : Faculté de l'environnement naturel, architectural et construit à l'EPFL : fr : School of Architecture, Civil and Environmental Engineering at EPFL : school-architecture-civil-environmental-engineering-epfl
+karolinska-institutet : Karolinska Institutet : sv : Royal Caroline Institute : royal-caroline-institute
+koninklijk-nederlands-meteorologisch-instituut-global-climate-division : Koninklijk Nederlands Meteorologisch Instituut mondiale klimaat divisie : nl : Royal Dutch Meteorological Institute Global Climate Division : royal-dutch-meteorological-institute-global-climate-division
+rijkswaterstaat-waterdienst : Rijkswaterstaat Ministerie van Infrastructuur en Milieu : nl : Rijkswaterstaat Ministry of Infrastructure and the Environment : rijkswaterstaat-ministry-infrastructure-environment
+sapienza-universita-di-roma : Sapienza – Università di Roma : it : Sapienza University of Rome : sapienza-university-rome
+universidad-autonoma-de-baja-california : Universidad Autónoma de Baja California : es : Autonomous University of Baja California : autonomous-university-baja-california
+universidad-autonoma-de-baja-california-instituto-de-investigaciones-oceanologicas : Universidad Autónoma de Baja California Instituto de Investigaciones Oceanologicas : es : Autonomous University of Baja California Oceanology Research Institute : autonomous-university-baja-california-oceanology-research-institute
+universidad-de-antioquia-facultad-de-ingenieria : Universidad de Antioquia Facultad de Ingeniería : es : University of Antioquia Faculty of Engineering : university-antioquia-faculty-engineering
+universidad-de-coasta-rica : Universidad de Costa Rica : es : University of Costa Rica  : university-costa-rica
+universidad-costa-rica-escuela-fisica : Universidad de Costa Rica Escuela de Física : es : University of Costa Rica School of Physics : university-costa-rica-school-physics
+facultad-microbiologia : Universidad de Costa Rica Facultad de Microbiología : es : University of Costa Rica  Faculty of Microbiology : university-costa-rica-faculty-microbiology
+universidade-de-lisboa : Universidade de Lisboa : pt : University of Lisbon : university-lisbon
+universidade-de-santiago-de-compostela : Universidade de Santiago de Compostela : gl : University of Santiago de Compostela : university-santiago-de-compostela
+universidade-de-santiago-de-compostela-group-nonlinear-physics : Universidade de Santiago de Compostela Grupo de Física Non Lineal : gl : University of Santiago de Compostela Group of Nonlinear Physics : university-santiago-de-compostela-group-nonlinear-physics
+universidade-de-sao-paulo : Universidade de São Paulo : pt : University of Sao Paulo : university-sao-paulo
+universidade-de-sao-paulo-department-economics : Universidade de São Paulo Faculdade de Economia, Administração e Contabilidade  : pt : University of Sao Paulo Department of Economics, Administration and Accounting (FEA) : university-sao-paulo-department-economics-administration-accounting-fea
+universidade-de-sao-paulo-instituto-de-eletrotecnica-e-energia : Universidade de São Paulo Instituto de Eletrotécnica e Energia : pt : University of Sao Paulo Institute for Energy and Environment : university-sao-paulo-institute-energy-environment
+universidade-federal-do-rio-de-janeiro : Universidade Federal do Rio de Janeiro : pt : Federal University of Rio de Janeiro : federal-university-rio-de-janeiro
+universidade-federal-do-rio-de-janeiro-centro-de-tecnologia : Universidade Federal do Rio de Janeiro, Centro de Tecnologia : pt : Federal University of Rio de Janeiro Center of Technology : federal-university-rio-de-janeiro-center-technology
+universitat-bern : Universität Bern : sv : University of Bern : university-bern
+universitat-stuttgart : Universität Stuttgart) : de : University of Stuttgart : university-stuttgart
+universit-catholique-de-louvain : Université catholique de Louvain : fr : Catholic University of Louvain : catholic-university-louvain
+universite-de-paris-one-pantheon-sorbonne : Université de Paris 1 Panthéon-Sorbonne : fr : Pantheon-Sorbonne University : pantheon-sorbonne-university
+universite-de-rennes-one : Université de Rennes 1 : fr : University of Rennes 1 : university-rennes-1
+universite-de-rennes-one-geosciences-rennes : Université de Rennes 1 Géosciences Rennes : fr : University of Rennes 1 Geosciences Rennes : university-rennes-1-geosciences-rennes
+koninklijk-nederlands-meteorologisch-instituut-department-climate-research-seismology :  :  : Royal Dutch Meteorological Institute Department of Climate Research and Seismology : royal-dutch-meteorological-institute-department-climate-research-seismology
+centre-de-recerca-en-epidemiologia-ambiental : Centre de Recerca en Epidemiologia Ambiental : ca : Centre for Research in Environmental Epidemiology : centre-research-environmental-epidemiology
+instituto-de-investigaciones-marinas-iim : Instituto de Investigaciones Marinas IIM : gl : Institute of Marine Research IIM : institute-marine-research-iim
+max-planck-institut-fur-meteorologie : Max Planck Institut für Meteorologie : de : Max Planck Institute for Meteorology : max-planck-institute-meteorology
+centro-investigacion-enfermedades-tropicales : Centro de Investigación en Enfermedades Tropicales : es : Center for Research on Tropical Diseases : center-research-tropical-diseases
+museum-national-dhistorie-naturelle : Muséum National d’Histoire Naturelle : fr : French National Museum of Natural History : french-national-museum-natural-history
+leibniz-institut-fur-meereswissenschafte-an-der-universitat-kiel : Leibniz-Institut für Meereswissenschaften, IFM-GEOMAR : de : GEOMAR Helmholtz Centre for Ocean Research Kiel : geomar-helmholtz-centre-ocean-research-kiel
