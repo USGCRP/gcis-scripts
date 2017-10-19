@@ -189,10 +189,11 @@ sub create_resource_in_gcis {
         delete $cloned_new_resource->{$_} for qw(uri author pmid);
     }
     $N_UPDATES++;
-    my $created_resource = $gcis_handle->post("/$new_resource_path", $cloned_new_resource) or die " unable to add $new_resource_path : $new_resource_uri";
+    my $created_resource = $gcis_handle->post("/$new_resource_path", $cloned_new_resource)
+        or warn " unable to add $new_resource_path : $new_resource_uri";
     sleep($wait) if $wait > 0;
 
-    return $created_resource->{uri};
+    return $created_resource->{uri} // undef;
 }
 
 # Given a GCIS Handle and the EndNote reference info, create the reference With a child_pub linked
@@ -215,7 +216,7 @@ sub connect_reference_and_child {
         child_publication_uri => $child_pub_uri,
         identifier => $ref->{identifier},
         attrs => $ref->{attrs},
-        }) or die " unable to add child pub : $child_pub_uri";
+        }) or warn " unable to connect child pub : $child_pub_uri to $reference_uri";
     sleep($wait) if $wait > 0;
 
     return 1;
@@ -331,7 +332,16 @@ sub import_journal_from_article {
 
     # Ensure we have some unique identifier for the Journal
     if ( ! $existing_journal_uri && ! $journal->{print_issn} ) {
-        die " ERROR: no journal issn : $journal->{uri} : $reference->{uri}";
+        warn " ERROR: no journal issn : $journal->{uri} : $reference->{uri}";
+        # QA out
+        create_qa_entry(
+            reference         => $reference,
+            gcis_type         => 'journal',
+            ref_type          => $reference->{attrs}{reftype},
+            action            => 'Could not create Journal',
+        );
+        return;
+
     }
 
     my ($journal_identifier, $action);
@@ -491,7 +501,11 @@ sub populate_child_publication {
         );
 
         $child_pub = create_resource_in_gcis( $gcis, $resource_data);
-        $action = "Created & linked publication.";
+        if ( $child_pub ) {
+            $action = "Created & linked publication.";
+        } else {
+            $action = "Failed to create publication";
+        }
         print "      " . ( $dry_run ? "(DRYRUN) " : "") . "Created publication: $child_pub\n";
     }
 
