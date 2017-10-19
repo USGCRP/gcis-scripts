@@ -2,30 +2,29 @@
 
 =head1 NAME
 
-    fix-tbibs-for-findings -- Ensure references associated with findings match tbib tags.
+    connect_findings_to_references.pl -- Ensure references associated with findings match tbib tags.
 
 =head1 OPTIONS
 
-=head2 B<url>
+=head2 B<--url>
 
     GCIS url, e.g. http://data-stage.globalchange.gov
 
-=head2 B<report>
+=head2 B<--report>
 
     report, e.g. nca3
 
-=head2 B<chapter_number>
+=head2 B<--chapter_number>
 
-    Chapter number.
+    Chapter number. Optional
 
-=head2 B<dry_run>, B<n>
+=head2 B<--dry_run>, B<n>
 
     Dry run.
 
 =head1 EXAMPLES
 
-    # fix refs on local gcis instance
-    fix-tbibs-for-findings -u http://localhost:3000 -r nca3 -c 5
+    connect_findings_to_references.pl -u http://localhost:3000 -r nca3 -c 5
 
 =cut
 
@@ -49,14 +48,18 @@ GetOptions(
 
 die "missing url" unless $url;
 die "missing report" unless $report;
-die "missing chapter number" unless $chapter_number;
 
 my $c = Gcis::Client->new;
 
 $c->url($url);
 $c->find_credentials->login;
 
-my @findings = $c->findings(report => $report, chapter_number => $chapter_number);
+my @findings;
+if ( $chapter_number ) {
+    @findings = $c->findings(report => $report, chapter_number => $chapter_number);
+} else {
+    @findings = $c->findings(report => $report);
+}
 
 my @fields = qw/statement uncertainties evidence confidence process/;
 
@@ -64,6 +67,8 @@ for my $f (@findings) {
     my $finding_uri = $f->{uri} or die "missing uri";
     my $finding = $c->get_form($f);
 
+    #say "Finding:" . Dumper $f;
+    #say "Finding form:" . Dumper $finding;
     my @uuids;
     say "finding $finding->{identifier}";
     for my $field (@fields) {
@@ -71,25 +76,33 @@ for my $f (@findings) {
         push @uuids, $_ =~ m[<tbib>([a-z0-9-]+)</tbib>]g;
     }
 
+    #say "UUIDs:" . Dumper \@uuids;
+
     my $finding_with_refs = $c->get($finding_uri);
+    #say "Finding with refs" . Dumper $finding_with_refs;
     my %extra = map {
         # /reference/uuid => 1
         $_->{uri} => 1
     } @{ $finding_with_refs->{references} };
+    #say "Initial Extras: " . Dumper \%extra;
 
     say "# uuids in text : ".@uuids;
     # Associate references with this finding.
     for my $refid (@uuids) {
         delete $extra{"/reference/$refid"};
         my $ref = $c->get("/reference/$refid");
-        next if grep { $finding_uri eq $_ } @{ $ref->{sub_publication_uris} };
-        if ($dry_run) {
+        ##say "Ref for $refid: " . Dumper $ref;
+        if (grep { $finding_uri eq $_ } @{ $ref->{publications} } ){
+            say "already connected to $refid";
+        }
+        elsif ($dry_run) {
             say "ready to post to /reference/rel/$refid";
         } else {
             say "$finding_uri -> /reference/$refid";
             $c->post("/reference/rel/$refid.json", { add_subpubref_uri => $finding_uri }) or warn $c->error;
         }
     }
+    #say "Final Extras: " . Dumper \%extra;
 
     for my $extra (keys %extra) {
         say "extra : $extra";
@@ -103,5 +116,4 @@ for my $f (@findings) {
     }
 }
 
- 
 
