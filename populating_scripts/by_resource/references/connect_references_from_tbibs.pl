@@ -91,7 +91,7 @@ for my $r (@resources) {
     #say "Resource" . Dumper $r;
     #say "Resource ($resource) form:" . Dumper $resource;
     my @uuids;
-    say "resource ($resource_type) $resource->{identifier}";
+    #say "resource ($resource_type) $resource->{identifier}";
     for my $field (@{ $fields->{$resource_type} }) {
         my $field_value = $resource->{$field};
         next unless $field_value;
@@ -122,7 +122,7 @@ for my $r (@resources) {
             say "ready to post to /reference/rel/$refid";
         } else {
             say "$resource_uri -> /reference/$refid";
-            $c->post("/reference/rel/$refid.json", { add_subpubref_uri => $resource_uri }) or warn $c->error;
+            $c->post("/reference/rel/$refid.json", { add_publication_uri => $resource_uri }) or warn $c->error;
         }
     }
     #say "Final Extras: " . Dumper \%extraneous;
