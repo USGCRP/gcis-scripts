@@ -138,7 +138,7 @@ for my $r (@resources) {
         if ($dry_run) {
             say "ready to post to $uri to remove $resource_uri";
         } else {
-            $c->post("$uri.json", { delete_subpub => $resource_uri }) or warn $c->error;
+            $c->post("$uri.json", { delete_publication => $resource_uri }) or warn $c->error;
         }
     }
 }
