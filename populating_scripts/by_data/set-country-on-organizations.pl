@@ -64,7 +64,9 @@ pod2usage(msg => "missing url", verbose => 1) unless $url;
     say "     dry run" if $dry_run;
 
     while (<>) {
-       last if $max_updates <= $n_processed;
+       if ($max_updates != -1) {
+           last if $max_updates <= $n_processed;
+       }
        chomp;
        my ($uri, $country_code) = split ",";
        if (!($uri =~ /^\//)) { 
@@ -78,9 +80,7 @@ pod2usage(msg => "missing url", verbose => 1) unless $url;
        }
        my $f = $uri;
        $f =~ s[/organization/][/organization/form/update/];
-       say $f;
        my $r = $a->get($f);
-       say Dumper $r;
        if (!$r) {
            say "     - does not exist";
            $n_processed++;  
@@ -102,15 +102,10 @@ pod2usage(msg => "missing url", verbose => 1) unless $url;
            $n_processed++;
            next;
        }
-       else {
-           say "not dry run";
-           exit;
-       }
        $r->{country_code} = $country_code;
        $a->post($uri, $r) or 
            say "     ** update error **";
        say  "     - added country_code";
-       next if $max_updates == -1;
        $n_processed++;  
     }
     say " done";
