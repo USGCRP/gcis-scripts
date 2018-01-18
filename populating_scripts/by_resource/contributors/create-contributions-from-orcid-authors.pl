@@ -64,6 +64,7 @@ warn "url       : $url\n";
 warn "input CSV : $input_file\n";
 
 my $gcis  = Gcis::Client->connect(url => $url);
+my $seen_orcids = {};
 
 sub debug($) {
     warn "# @_\n";
@@ -102,35 +103,86 @@ my $contributor_input_lines = intake_csv();
 my $handled;
 for my $contributor_line ( @$contributor_input_lines ) {
 
-## if `confirm_match` is SKIP - skip it
-    if ( $contributor_line->{confirm_match} eq 'SKIP' ) {
+## if `confirm_match` is Ignore - skip it
+    if ( $contributor_line->{confirm_match} eq 'Ignore' ) {
         say "Skipping entry for DOI $contributor_line->{doi}, ORCiD: $contributor_line->{orcid}." if $verbose;
         next;
     }
 
     my $person_id = handle_person( $contributor_line );
-## Person Handling
-### If there is no `person_id` - create a person with the names, orcid, and person_url
-### Else - if `confirm_match` is update name, update url, or update name & url - do that.
-## Complete Person Handling
+
     my $org_id = handle_organization( $contributor_line );
 ## Org Handling
 ### If there is no `organization_id` - create an org with the
 #    "org_name org_type org_url org_country_code org_international_flag related_org related_org_relationship"
 ### If tehre is an organization_id - we're good
 ## Complete Org Handling
+
+    update_orcid( $contributor_line );
+### Always update the ORCid
+
     my $contributor_id = handle_contributor( $person_id, $org_id, $contributor_line->{doi}, $contributor_line->{contributor_role} );
 ## Contributor Handling
 ### Must be a contributor role
 ### If the Person + Org + Role already exists on this Article - done
 ### Otherwise, create Contributor
 ## Complete Contributor section
+
     my $msg = "Created Contributor\tDOI $contributor_line->{doi}\tPerson $person_id\tOrg $org_id\tRole $contributor_line->{contributor_role}";
     say $msg if $verbose;
     push @$handled, $msg;
 }
 
 dump_output($handled);
+
+sub handle_person {
+    my ($contributor_line) = @_;
+
+    # New person
+    ## No assigned person id and No seen ORCid (created from an earlier line)
+    my $gcis_person;
+    if ( $contributor_line->{person_id} eq "N/A" && ! exists $seen_orcids->{ $contributor_line->{orcid} }) {
+       $gcis_person = create_person($contributor_line);
+    }
+    elsif ( $contributor_line->{person_id} ne "N/A") {
+        $gcis_person = $gcis->get("/person/$contributor_line->{person_id}");
+    }
+    else {
+        $gcis_person = $gcis->get("/person/$contributor_line->{orcid}");
+    }
+
+### ORCiD MisMatch
+    my $orcid_mismatch = check_existing_orcid( $contributor_line );
+    if ( $orcid_mismatch ) {
+        my $msg = "Existing ORCid Differs\tDOI $contributor_line->{doi}\tPerson ORCid $orcid_mismatch\tSheet ORCid $contributor_line->{orcid}";
+        say $msg if $verbose;
+        push @$handled, $msg;
+        return;
+    }
+
+### Update Name, URL as requested
+    my $update_name, $update_url;
+    if ( $contributor_line->{confirm_match} eq 'Update URL in GCIS' ) {
+        $update_url = 1;
+        # add new url to update hash
+    }
+    elsif ( $contributor_line->{confirm_match} eq 'Update Name & URL in GCIS' ) {
+        # add new url to update hash
+        # add new name to update hash
+        $update_url = 1;
+        $update_name = 1;
+    }
+    elsif ( $contributor_line->{confirm_match} eq 'Update Name in GCIS' ) {
+        $update_name = 1;
+        # add new name to update hash
+    }
+
+    # if update hash has values, send update
+
+
+    $seen_orcids->{ $contributor_line->{orcid} } = 1;
+## Complete Person Handling
+}
 
 #sub find_or_create_gcis_person($person) {
 #    my $match;
