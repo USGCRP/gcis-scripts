@@ -68,6 +68,56 @@ warn "input CSV : $input_file\n";
 my $gcis  = Gcis::Client->connect(url => $url);
 my $seen_entities = {};
 
+# Read in the file, such that we have an array of intake hashes.
+my $contributor_input_lines = intake_csv();
+
+my $handled;
+for my $contributor_line ( @$contributor_input_lines ) {
+
+    ## if `confirm_match` is Ignore - skip it
+    if ( $contributor_line->{confirm_match} eq 'Ignore' ) {
+        say "Skipping entry for DOI $contributor_line->{doi}, ORCiD: $contributor_line->{orcid}." if $verbose;
+        next;
+    }
+
+    # Check for conflicting person info. Update if required. Hand back the person.
+    my $person = handle_person( $contributor_line );
+    next unless $person;
+
+    ### Always update the ORCid
+    update_orcid( $person, $contributor_line->{orcid} );
+
+    ## Org Handling
+    my $org = handle_organization( $contributor_line );
+    if ( $org eq 'skip_contributor' ) {
+        # We wanted to update the person, but organization & contributor are fine. Done with this line
+        my $msg = "Updated Person $person->{id}, shortcut out of Organization & Contributor updating.";
+        say $msg if $verbose;
+        push @$handled, $msg;
+        next;
+    }
+
+    my $contributor_id = handle_contributor(
+        $person,
+        $org,
+        $contributor_line->{doi},
+        $contributor_line->{contributor_role},
+        $contributor_line->{sort_key},
+    );
+
+    my $msg = "Created Contributor\tDOI $contributor_line->{doi}\tPerson $person->{id}\tOrg $org->{identifier}\tRole $contributor_line->{contributor_role}";
+    say $msg if $verbose;
+    push @$handled, $msg;
+}
+
+dump_output($handled);
+
+## Functions
+
+sub dump_output {
+    return 1;
+}
+
 sub debug($) {
     warn "# @_\n";
 }
@@ -99,48 +149,6 @@ sub intake_csv {
     return \@input_lines;
 }
 
-# Read in the file, such that we have an array of intake hashes.
-my $contributor_input_lines = intake_csv();
-
-my $handled;
-for my $contributor_line ( @$contributor_input_lines ) {
-
-    ## if `confirm_match` is Ignore - skip it
-    if ( $contributor_line->{confirm_match} eq 'Ignore' ) {
-        say "Skipping entry for DOI $contributor_line->{doi}, ORCiD: $contributor_line->{orcid}." if $verbose;
-        next;
-    }
-
-    # Check for conflicting person info. Update if required. Hand back the person.
-    my $person = handle_person( $contributor_line );
-    next unless $person;
-
-    ### Always update the ORCid
-    update_orcid( $person, $contributor_line->{orcid} );
-
-    ## Org Handling
-    my $org = handle_organization( $contributor_line );
-    if ( $org eq 'skip_contributor' ) {
-        # We wanted to update the person, but organization & contributor are fine. Done with this line
-        my $msg = "Updated Person $person->{id}, shortcut out of Organization & Contributor updating.";
-        say $msg if $verbose;
-        push @$handled, $msg;
-        next;
-    }
-
-    my $contributor_id = handle_contributor( $person, $org, $contributor_line->{doi}, $contributor_line->{contributor_role} );
-## Contributor Handling
-### Must be a contributor role
-### If the Person + Org + Role already exists on this Article - done
-### Otherwise, create Contributor
-## Complete Contributor section
-
-    my $msg = "Created Contributor\tDOI $contributor_line->{doi}\tPerson $person->{id}\tOrg $org->{identifier}\tRole $contributor_line->{contributor_role}";
-    say $msg if $verbose;
-    push @$handled, $msg;
-}
-
-dump_output($handled);
 
 sub handle_person {
     my ($contributor_line) = @_;
@@ -215,14 +223,14 @@ sub create_person {
     $updates->{last_name}   = $contributor_line->{last_name};
     $updates->{orcid}       = $contributor_line->{orcid};
 
-    my $final_gcis_person = $gcis->post('/person',$updates)
+    my $final_gcis_person = $gcis->post('/person',$updates);
     return $final_gcis_person;
 }
 
 sub check_existing_orcid {
     my ($contributor_line, $gcis_person) = @_;
 
-    return 1 if ( $contributor_line->{orcid} eq $gcis_person->{orcid} );
+    return 1 if ( $contributor_line->{orcid} ne $gcis_person->{orcid} );
     return;
 }
 
@@ -264,7 +272,7 @@ sub create_organization {
     $updates->{organization_type_identifier} = $contributor_line->{org_type};
     $updates->{international}                = $contributor_line->{org_international_flag} if $contributor_line->{org_international_flag};
 
-    my $final_gcis_org = $gcis->post('/organization', $updates)
+    my $final_gcis_org = $gcis->post('/organization', $updates);
     return $final_gcis_org;
 }
 
@@ -282,85 +290,26 @@ sub update_orcid {
     my $final_gcis_person = $gcis->post($person->{uri}, $updated_person);
     return $final_gcis_person;
 }
-#sub find_or_create_gcis_person($person) {
-#    my $match;
-#
-#    # ORCID
-#    if ($person->{orcid} and $match = $gcis->get("/person/$person->{orcid}")) {
-#        debug "Found orcid: $person->{orcid}";
-#        return $match;
-#    }
-#
-#    # Match first + last name
-#    if ($match = $gcis->post_quiet("/person/lookup/name",
-#            { last_name => $person->{last_name},
-#              first_name => $person->{first_name}
-#          })) {
-#        if ($match->{id}) {
-#            return $match;
-#        }
-#    }
-#
-#    # Add more heuristics here
-#
-#    return if $dry_run;
-#
-#    unless ($person->{first_name}) {
-#        debug "no first name ".Dumper($person);
-#        return;
-#    }
-#
-#    unless ($person->{last_name}) {
-#        debug "no last name ".Dumper($person);
-#        return;
-#    }
-#
-#    debug "adding new person $person->{first_name} $person->{last_name}";
-#    my $new = $gcis->post("/person" => {
-#            first_name => $person->{first_name},
-#             last_name => $person->{last_name},
-#                 orcid => $person->{orcid}
-#            }) or do {
-#            warn "Error creating ".Dumper($person)." : ".$gcis->error;
-#            return;
-#        };
-#
-#    return $new;
-#}
 
-#sub add_contributor_record($person,$article,$sort_key) {
-#    warn "dry run" if $dry_run;
-#    return if $dry_run;
-#
-#    my $uri = $article->{uri};
-#    $uri =~ s[article][article/contributors];
-#    $gcis->post( $uri => {
-#            person_id => $person->{id},
-#            role => 'author',
-#            sort_key => $sort_key,
-#        }) or debug "error posting to $uri: ".$gcis->error;
-#}
+sub handle_contributor {
+    my ($person, $org, $doi, $role, $sort_key) = @_;
 
+    return unless $role;
 
-# for my $article ($gcis->get("/article", { all => $all })) {    ### Getting--->   done
-#     my $doi = $article->{doi} or next;
-#     my $some = get_orcid_authors($doi);
-#     my $all = get_xref_authors($doi) or die "no authors for $doi";
-#     my $merged = combine_author_list($some,$all) or next;
-#     if ($dump) {
-#         printf "%100s\n",$doi;
-#         for (@$merged) {
-#             printf "%-25s %-30s %-30s\n",$_->{orcid},$_->{first_name},$_->{last_name};
-#         }
-#         next;
-#     }
-#     my $i = 10;
-#     for my $person (@$merged) {
-#         my $found = find_or_create_gcis_person($person);
-#         next unless $found;
-#         add_contributor_record($found, $article, $i);
-#         $i += 10;
-#     }
-# }
+    # Does the contributor exist?
+    my $contributions = $gcis->get("/person/$person->{id}/contributions/$role/article");
+    for my $contribution ( @$contributions ) {
+        return 1 if $contribution->{doi} eq $doi;
+    }
+    my $contributor_fields = {
+        person_id               => $person->{id},
+        organization_identifier => $org->{identifier},
+        role                    => $role,
+    };
+    $contributor_fields->{sort_key} = $sort_key if defined $sort_key;
 
+    my $result = $gcis->post("/article/contributors/$doi/", $contributor_fields);
+
+    return 1;
+}
 
