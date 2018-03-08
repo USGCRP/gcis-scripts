@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<concept id="304323" uuid="6433e330-3797-4cf9-a8ba-d26d39624459" lang="en" checksum="" isRoot="false" status="" xsi:noNamespaceSchemaLocation="http://gcmd.gsfc.nasa.gov/Aboutus/xml/kms/kms.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <termsOfUse>http://gcmd.nasa.gov/r/l/TermsOfUse</termsOfUse>
+    <keywordVersion>8.5</keywordVersion>
+    <schemeVersion>2018-02-28 09:18:10</schemeVersion>
+    <prefLabel id="304291" status="NO_CHANGE">PHOTOCHEMISTRY</prefLabel>
+    <altLabels/>
+    <definition status="NO_CHANGE" reference="Glossary of Meteorology, American Meteorological Society, 2017." id="240437">The study of the chemical and physical changes occurring when a molecule or atom absorbs light.</definition>
+    <altSymbols/>
+    <broader>
+        <conceptBrief id="303507" uuid="b9c56939-c624-467d-b196-e56a5b660334" prefLabel="ATMOSPHERIC CHEMISTRY" conceptSchemeId="663" conceptScheme="sciencekeywords" isLeaf="false" status=""/>
+    </broader>
+    <narrower>
+        <conceptBrief id="304325" uuid="0fd2b083-e65c-443b-9794-2c355ebac06b" prefLabel="PHOTOLYSIS RATES" conceptSchemeId="663" conceptScheme="sciencekeywords" isLeaf="true" status=""/>
+    </narrower>
+    <related/>
+    <conceptScheme id="663" name="sciencekeywords" longName="Science Keywords"/>
+    <resources/>
+    <changeNotes>
+        <changeNote id="178439" date="2017-03-15" userId="sritz" userNote="" status="NO_CHANGE">
+            <changeNoteItems>
+                <changeNoteItem id="200921" operation="INSERT" entity="Definition" entityId="0" newValue="id: null
+text: The study of the chemical and physical changes occurring when a molecule or atom absorbs light.
+language code: en" systemNote="insert Definition" status=""/>
+            </changeNoteItems>
+        </changeNote>
+    </changeNotes>
+    <lastModifiedDate>2017-03-15</lastModifiedDate>
+</concept>
