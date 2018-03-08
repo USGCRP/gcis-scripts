@@ -74,4 +74,19 @@ See the latest version of a keyword:
 Command line: `curl -k https://gcmd.nasa.gov/kms/concept/[UUID]?format=xml`  
 Web: Go to `https://gcmd.nasa.gov/kms/concept/[UUID]?format=xml`, right click and 'View Page Source'  
 
+# GCMD Keyword Import
 
+This script can import new GCMD keyword sets, so long as they follow the XML format. As of 2018-03, they all seem to do so.
+
+For example, to import the GCMD Locations keyword set:  
+ 
+  - locate the top keyword's UUID: `713eb469-abe4-4b6b-bad6-134187deabd8`
+  - dryrun the script with it:
+    ```
+    ./update_gcmd_keywords.pl 
+      --url https://data-stage.globalchange.gov 
+      --root "713eb469-abe4-4b6b-bad6-134187deabd8" 
+      --dry
+      --verbose
+    ```
+  - if all looks right, run without the `dry` flag to import them.
