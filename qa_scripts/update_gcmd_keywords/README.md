@@ -90,3 +90,9 @@ For example, to import the GCMD Locations keyword set:
       --verbose
     ```
   - if all looks right, run without the `dry` flag to import them.
+    ```
+    ./update_gcmd_keywords.pl 
+      --url https://data-stage.globalchange.gov 
+      --root "713eb469-abe4-4b6b-bad6-134187deabd8" 
+      --verbose >./log/YYYY_MM_DD_locations_import.out
+    ```
