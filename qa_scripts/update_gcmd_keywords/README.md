@@ -8,6 +8,8 @@ from GCMD's XML endpoint.
 A GCMD Keyword can have four states:  
  - Up to date - no changes are made in GCIS.  
    `Checking keyword [...] -  (Science Keywords) up to date`
+ - New - this keyword is new to GCIS. Keyword is added to GCIS.
+   `Checking keyword [...] -  (SNOW PELLETS) new to GCIS`
  - Changed
    - _Data_ - the label and/or definition have changed. GCIS is updated.  
      `Checking keyword [...] -  (EARTH SCIENCE) label/definition differs!`
