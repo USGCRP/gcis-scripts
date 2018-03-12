@@ -5,6 +5,20 @@
 This script, when run, will update the GCMD keywords to the latest versions available
 from GCMD's XML endpoint.
 
+A GCMD Keyword can have four states:  
+ - Up to date - no changes are made in GCIS.  
+   `Checking keyword [...] -  (Science Keywords) up to date`
+ - Changed
+   - _Data_ - the label and/or definition have changed. GCIS is updated.  
+     `Checking keyword [...] -  (EARTH SCIENCE) label/definition differs!`
+   - _Moved_ - the GCMD parent keyword is different. GCIS is updated.  
+     `Checking keyword [...] -  (FLIGHT LEVEL WINDS) moved!`
+   - _Both_ - label/definition and parent keyword differs. GCIS is updated twice.  
+     `Checking keyword [...] -  (TURBULENCE) label/definition differs! (TURBULENCE) moved!`
+ - Defunct - GCMD no longer has this keyword. GCIS is **not updated**.  
+   Removing these keywords is a manual process. See [below](#defunct-keywords)  
+   `Checking keyword [...] -  (HYDROMETEORS) now defunct`
+
 See the `example_gcmd.xml` for the output format the script expects.
 
 See the logs folder for the previous updates' run logs.
