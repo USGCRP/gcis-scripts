@@ -1,0 +1,7 @@
+GCIS URI,GCMD Keyword UUID,Entity Type,Extra Col 1, Extra Col 2,Notes
+/report/nca3/chapter/water-energy-land-use/figure/energy-water-land-and-climate-interactions,91697b7d-8f2b-4954-850e-61d5f61c867d,figure,foo,bar,Normal line. Only the first three columns matter.
+/report/nca3/chapter/water-energy-land-use/figure/energy-water-land-and-climate-interactions,91697b7d-8f2b-4954-850e-61d5f61c867d,figure,baz,zap,This is a repeat URI+UUID and should fail gracefully (in dry-run repeats above)
+/report/nca3/chapter/water-energy-land-use/figure/energy-water-land-and-climate-interactions,e9f67a66-e9fc-435c-b720-ae32a2c3d8f5,figure,baz,zap,This is a repeat URI but new UUID and should work
+/report/nca3/chapter/water-energy-land-use,e9f67a66-e9fc-435c-b720-ae32a2c3d8f5,chapter,baz,zap,This is a new URI but repeat UUID and should work
+/report/nca3/chapter/water-energy-land-use/figure/energy-water-land-and-climate-interactions,464de0a5-2bb9-412-9fd3-1634cbc4e739,figure,,,Invalid GCMD keywords should fail gracefully
+/report/nc3/chapter/water-energy-land-use/figure/energy-water-land-and-climate-interactions,464de0a5-2bb9-412-9fd3-1634cbc4e739,figure,,,Invalid URI should fail gracefully
