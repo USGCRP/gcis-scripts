@@ -30,9 +30,9 @@ doi.org/10.1097/EDE.0b013e31816a1ce3
 
 ### Querying OrcID
 
-**Input**: DOI List
-**Script**: find-authors-from-orcid.pl
-**Output**: QA CSV
+**Input**: DOI List  
+**Script**: find-authors-from-orcid.pl  
+**Output**: QA CSV  
 
 This is a read-only script to be run against GCIS.
 
@@ -51,4 +51,98 @@ See `perldoc find-authors-from-orcid.pl` for technical details.
 
 ### Processing CSV
 
+#### Initial CSV
+The previous script will produce a CSV with these columns containing data:
+
+ - `last_name`    - Person's last name according to OrcID
+ - `first_name`   - Person's first name according to OrcID
+ - `orcid`        - Person's OrcID according to OrcID
+ - `doi`          - the DOI we queried OrcID with
+ - `person_id`    - if GCIS found a person in GCIS with this orcid or the full name
+ - `match_method` - if we found a person_id, did we find it via orcid (reliable) or full name (error prone)
+
+It will also provide the following rows to fill out:
+
+ - `confirm_person_match`
+ - `organization_id`
+ - `person_url`
+ - `org_name`
+ - `org_type`
+ - `org_url`
+ - `org_country_code`
+ - `org_international_flag`
+ - `sort_key`
+ - `contributor_role`
+
+#### CSV Processing Steps
+
+##### Person info
+**Confirm Person Match, if any**  
+
+Confirm the Person in GCIS and the Person in OrcID are actually a match.  
+
+If a match, enter "Yes" in the confirm_person_match field.  
+If not a match, remove the `person_id` and proceed to the next step.  
+
+**Confirm New Person, if no Match**  
+
+If no `person_id` is provided, the script didn't find this person in GCIS.  
+Confirm via checking the last name.  
+
+If a matching GCIS person is found, add their `person_id` to the column and enter "Yes" in the confirm_person_match field.  
+
+If no person is found, enter "New" in the confirm_person_match field (required)  
+Research to find an appropriate URL and add to the `person_url` column. (optional, but encouraged).  
+
+**Person Update**  
+
+If the GCIS person exists but requires an update to their name or URL, enter the correct name/url in the appropriate field and set the confirm_person_match to "Update [thing] in GCIS".  
+
+##### Organization info
+
+Research to find the Organization the person was affiliated with in the creation of this article.  
+
+If the organization already exists in GCIS, enter the organization identifier in `organization_id`.  
+If the organization is new to GCIS, enter the correct information in the fields:  
+
+ - `org_name`
+ - `org_type`
+ - `org_url`
+ - `org_country_code`
+ - `org_international_flag`
+
+##### Contributor info
+
+Enter the desired role_type and sort_key for this contributor.  
+Blank role type will be treated as 'author'  
+
 ### Ingesting CSV to GCIS
+
+**Input**: CSV List  
+**Script**: create-contributions-from-orcid-authors.pl  
+**Output**: CSV of changes made  
+
+This script will update the GCIS istance it is run against.
+
+```
+./create-contributions-from-orcid-authors.pl \
+   --url https://data-review.globalchange.gov \
+   --input example_orcid_results.csv \
+   --verbose
+```
+
+The script takes the combined CSV information and handles these situations:
+
+  - Persons
+    - Finds existing person
+    - Creates a new person
+    - Updates an existing persons name and/or URL
+    - Will error if the person in GCIS has a different OrcID
+  - Organizations
+    - Finds existing orgs
+    - Creates a new org
+  - Contributor
+    - Creates new contributors
+    - Asserts the contributor with the role exists
+
+
