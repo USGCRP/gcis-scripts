@@ -76,6 +76,8 @@ It will also provide the following rows to fill out:
 
 #### CSV Processing Steps
 
+If the row should be ignored, enter ignore into the confirm_person_match field.
+
 ##### Person info
 **Confirm Person Match, if any**  
 
@@ -145,4 +147,14 @@ The script takes the combined CSV information and handles these situations:
     - Creates new contributors
     - Asserts the contributor with the role exists
 
+Output CSV will have the following columns:
 
+  - doi             - DOI of the line
+  - orcid           - OrcID of the line
+  - contrib_role    - Contributor role of the line
+  - person_existed  - Whether the person existed in GCIS (TRUE), or was created (blank)
+  - person_updated  - If the person was updated, says what was updated. Otherwise blank.
+  - org_existed     - Whether the org existed in GCIS (TRUE), or was created (blank)
+  - contrib_existed - Whether the contrib existed in GCIS (TRUE), or was created (blank)
+  - errored         - If the line couldn't be processed, this will say why
+  - ignored         - If we skipped the line

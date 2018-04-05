@@ -71,7 +71,8 @@ my $gcis  = Gcis::Client->connect(url => $url);
 # Read in the file, such that we have an array of intake hashes.
 my $contributor_input_lines = intake_csv();
 
-my $handled;
+my $processed_rows = [];
+my $row_process = {};
 my $processed_n = 0;
 for my $contributor_line ( @$contributor_input_lines ) {
 
@@ -85,15 +86,32 @@ for my $contributor_line ( @$contributor_input_lines ) {
     say "\t\tTest case $contributor_line->{'Test Case'}: Expected Result: $contributor_line->{'Expected Result'}:  " if $contributor_line->{'Test Case'} && $verbose;
     say "\t\t--------------------------------------------------------------";
 
+    my $row_process = {
+        doi             => $contributor_line->{doi},
+        orcid           => $contributor_line->{orcid},
+        contrib_role    => $contributor_line->{contributor_role} // "author",
+        ignored         => '',
+        person_existed  => '',
+        person_updated  => '',
+        org_existed     => '',
+        contrib_existed => '',
+        errored         => '',
+    };
     ## if `confirm_match` is Ignore - skip it
     if ( $contributor_line->{confirm_person_match} eq 'Ignore' ) {
         say "Skipping entry for DOI $contributor_line->{doi}, ORCiD: $contributor_line->{orcid}." if $verbose;
+        $row_process->{ignored} = "TRUE";
+        push @$processed_rows, $row_process;
         next;
     }
 
     # Check for conflicting person info. Update if required. Hand back the person.
     my $person = handle_person( $contributor_line );
-    next unless $person;
+    if (! $person ) {
+        $row_process->{errored} = "Couldn't get or create Person";
+        push @$processed_rows, $row_process;
+        next;
+    }
 
     ### Always update the ORCid
     update_orcid( $person, $contributor_line->{orcid} );
@@ -102,10 +120,9 @@ for my $contributor_line ( @$contributor_input_lines ) {
     my $org = handle_organization( $contributor_line );
     if ( $org eq 'skip_contributor' ) {
         # We wanted to update the person, but organization & contributor are fine. Done with this line
-        #TODOmy $msg = "Updated Person $person->{id}, shortcut out of Organization & Contributor updating.";
-        my $msg = "Updated Person, shortcut out of Organization & Contributor updating.";
-        say $msg if $verbose;
-        push @$handled, $msg;
+        $row_process->{skip_contrib} = "TRUE";
+        push @$processed_rows, $row_process;
+        say "Updated Person, shortcut out of Organization & Contributor updating." if $verbose;
         next;
     }
 
@@ -117,15 +134,28 @@ for my $contributor_line ( @$contributor_input_lines ) {
         $contributor_line->{sort_key},
     );
 
-    #TODOmy $msg = "Contributor\tDOI $contributor_line->{doi}\tPerson $person->{id}\tOrg $org->{identifier}\tRole $contributor_line->{contributor_role} completed";
+    say "Contributor\tDOI $contributor_line->{doi}\tPerson $person->{id}\tOrg $org->{identifier}\tRole $contributor_line->{contributor_role} completed";
+    push @$processed_rows, $row_process;
 }
 
-dump_output($handled);
+dump_output();
 
 ## Functions
 
 sub dump_output {
-    return 1;
+    my $csv = Text::CSV->new ( { binary => 1 } )  # should set binary attribute.
+        or die "Cannot use CSV: ".Text::CSV->error_diag ();
+    open my $fh, ">:encoding(utf8)", "output.csv" or die "output.csv: $!";
+    my @headers = keys %{$processed_rows->[0]};
+    $csv->say($fh, \@headers);
+    foreach my $row ( @$processed_rows ) {
+        my @printable;
+        foreach my $key ( @headers ) {
+            push @printable, $row->{$key};
+        }
+        $csv->say($fh, \@printable);
+    }
+    close $fh or die "output.csv: $!";
 }
 
 sub debug($) {
@@ -170,24 +200,25 @@ sub handle_person {
         # Query by ORCID, just to doublecheck
         if ( $gcis_person = $gcis->get("/person/$contributor_line->{orcid}") ) {
             say "Existing Person found via ORCID" if $verbose;
+            $row_process->{person_existed} = "TRUE";
         } else {
             # Brand new person
             say "Creating new person" if $verbose;
             $gcis_person = create_person($contributor_line);
+            $row_process->{person_existed} = "FALSE";
         }
     }
     else {
         say "Existing Person" if $verbose;
         $gcis_person = $gcis->get("/person/$contributor_line->{person_id}");
+        $row_process->{person_existed} = "TRUE";
     }
 
 ### ORCiD MisMatch
     my $orcid_mismatch = check_existing_orcid( $contributor_line, $gcis_person );
     if ( $orcid_mismatch ) {
-        say "OrcID Mismatch" if $verbose;
-        my $msg = "Existing ORCid Differs\tDOI $contributor_line->{doi}\tPerson ORCid $gcis_person->{orcid}\tSheet ORCid $contributor_line->{orcid}";
-        say $msg if $verbose;
-        push @$handled, $msg;
+        $row_process->{errored} = "OrcID in GCIS mismatched: $gcis_person->{orcid}";
+        say "Existing ORCid Differs" if $verbose;
         return;
     }
 
@@ -203,6 +234,7 @@ sub handle_person {
         $updated_person->{orcid}       = $gcis_person->{orcid};
         $updated_person->{id}          = $gcis_person->{id};
         $updates = 1;
+        $row_process->{person_updated} = "URL";
     }
     if ( $contributor_line->{confirm_person_match} eq 'Update Name & URL in GCIS' ) {
             say "Would update person url and name" if $verbose;
@@ -213,6 +245,7 @@ sub handle_person {
         $updated_person->{orcid}       = $gcis_person->{orcid};
         $updated_person->{id}          = $gcis_person->{id};
         $updates = 1;
+        $row_process->{person_updated} = "Name & URL";
     }
     if ( $contributor_line->{confirm_person_match} eq 'Update Name in GCIS' ) {
             say "Would update person name" if $verbose;
@@ -223,6 +256,7 @@ sub handle_person {
         $updated_person->{orcid}       = $gcis_person->{orcid};
         $updated_person->{id}          = $gcis_person->{id};
         $updates = 1;
+        $row_process->{person_updated} = "Name";
     }
 
     my $final_gcis_person = $gcis_person;
@@ -283,15 +317,18 @@ sub handle_organization {
         # Query by name, just to doublecheck
         if ( $gcis_organization = $gcis->post("/organization/lookup/name", { name => $contributor_line->{org_name}}) ) {
             say "Existing Org found via name" if $verbose;
+            $row_process->{org_existed} = "TRUE";
         } else {
             # Brand new org
             say "Creating new org" if $verbose;
             $gcis_organization = create_organization($contributor_line);
+            $row_process->{org_existed} = "FALSE";
         }
     }
     else {
         $gcis_organization = $gcis->get("/organization/$contributor_line->{organization_id}");
         say "Existing GCIS Org" if $verbose;
+        $row_process->{org_existed} = "TRUE";
     }
 
     return $gcis_organization;
@@ -340,12 +377,20 @@ sub handle_contributor {
     my ($person, $org, $doi, $role, $sort_key) = @_;
 
     return 1 if $dry_run;
+        #ignored         => '',
+        #person_existed  => '',
+        #person_updated  => '',
+        #org_existed     => '',
+        #contrib_existed => '',
+        #errored         => '',
+
 
     # Does the contributor exist?
     my $contributions = $gcis->get("/person/$person->{id}/contributions/$role/article");
     for my $contribution ( @$contributions ) {
         if ($contribution->{doi} eq $doi) {
             say "Contributor already exists" if $verbose;
+            $row_process->{contrib_existed} = "TRUE";
             return 1;
         }
     }
@@ -358,9 +403,8 @@ sub handle_contributor {
 
     my $result = $gcis->post("/article/contributors/$doi", $contributor_fields);
 
-    my $msg = "Created Contributor";
-    say $msg if $verbose;
-    push @$handled, $msg;
+    $row_process->{contrib_existed} = "TRUE";
+    say "Created Contributor" if $verbose;
 
     return 1;
 }
