@@ -47,6 +47,7 @@ use YAML::XS qw/Dump/;
 use Mojo::Util qw/html_unescape/;
 use Getopt::Long qw/GetOptions/;
 use Text::CSV;
+use Time::Piece;
 
 use v5.20;
 
@@ -145,7 +146,11 @@ dump_output();
 sub dump_output {
     my $csv = Text::CSV->new ( { binary => 1 } )  # should set binary attribute.
         or die "Cannot use CSV: ".Text::CSV->error_diag ();
-    open my $fh, ">:encoding(utf8)", "output.csv" or die "output.csv: $!";
+    my $t = localtime;
+    $t->time_separator('');
+    $t->date_separator('');
+    my $output = $t->date . "_" . $t->time . "_output_" . $input_file;
+    open my $fh, ">:encoding(utf8)", "$output" or die "$output: $!";
     my @headers = keys %{$processed_rows->[0]};
     $csv->say($fh, \@headers);
     foreach my $row ( @$processed_rows ) {
