@@ -57,6 +57,7 @@ GetOptions(
   'verbose'     => \(my $verbose = 0),
   'url=s'       => \(my $url),
   'input_csv=s' => \(my $input_file),
+  'max_line=s'  => \(my $max = -1),
 ) or die "bad opts";
 
 die 'missing url' unless $url;
@@ -66,15 +67,23 @@ warn "url       : $url\n";
 warn "input CSV : $input_file\n";
 
 my $gcis  = Gcis::Client->connect(url => $url);
-my $seen_entities = {};
 
 # Read in the file, such that we have an array of intake hashes.
 my $contributor_input_lines = intake_csv();
 
 my $handled;
+my $processed_n = 0;
 for my $contributor_line ( @$contributor_input_lines ) {
 
+    $processed_n++;
+    if ( $max ne -1 && $processed_n > $max ) {
+        say "Reached max $max processed rows! Done.";
+        exit;
+    }
+
+    say "------------------------------------------------------------------------------";
     say "\t\tTest case $contributor_line->{'Test Case'}: Expected Result: $contributor_line->{'Expected Result'}:  " if $contributor_line->{'Test Case'} && $verbose;
+    say "\t\t--------------------------------------------------------------";
 
     ## if `confirm_match` is Ignore - skip it
     if ( $contributor_line->{confirm_person_match} eq 'Ignore' ) {
@@ -108,10 +117,7 @@ for my $contributor_line ( @$contributor_input_lines ) {
         $contributor_line->{sort_key},
     );
 
-    #TODOmy $msg = "Created Contributor\tDOI $contributor_line->{doi}\tPerson $person->{id}\tOrg $org->{identifier}\tRole $contributor_line->{contributor_role}";
-    my $msg = "Created Contributor";
-    say $msg if $verbose;
-    push @$handled, $msg;
+    #TODOmy $msg = "Contributor\tDOI $contributor_line->{doi}\tPerson $person->{id}\tOrg $org->{identifier}\tRole $contributor_line->{contributor_role} completed";
 }
 
 dump_output($handled);
@@ -160,20 +166,19 @@ sub handle_person {
     # New person
     ## No assigned person id and No seen ORCid (created from an earlier line)
     my $gcis_person;
-    if ( $contributor_line->{person_id} eq "N/A" && ! exists $seen_entities->{ $contributor_line->{orcid} }) {
-        # Brand new person
-        say "Creating new person" if $verbose;
-        $gcis_person = create_person($contributor_line);
-    }
-    elsif ( $contributor_line->{person_id} ne "N/A") {
-        # Existing person in GCIS
-        say "Existing Person" if $verbose;
-        $gcis_person = $gcis->get("/person/$contributor_line->{person_id}");
+    if ( $contributor_line->{person_id} eq "N/A" ) {
+        # Query by ORCID, just to doublecheck
+        if ( $gcis_person = $gcis->get("/person/$contributor_line->{orcid}") ) {
+            say "Existing Person found via ORCID" if $verbose;
+        } else {
+            # Brand new person
+            say "Creating new person" if $verbose;
+            $gcis_person = create_person($contributor_line);
+        }
     }
     else {
-        # Person ID not provided, but we created this person earlier in the script
-        say "Created person on previous line" if $verbose;
-        $gcis_person = $gcis->get("/person/$seen_entities->{$contributor_line->{orcid}}");
+        say "Existing Person" if $verbose;
+        $gcis_person = $gcis->get("/person/$contributor_line->{person_id}");
     }
 
 ### ORCiD MisMatch
@@ -190,44 +195,46 @@ sub handle_person {
     my $updates = 0;
     my $updated_person;
     if ( $contributor_line->{confirm_person_match} eq 'Update URL in GCIS' ) {
-            say "Would update person" if $verbose;
+            say "Would update person url" if $verbose;
         $updated_person->{url}         = $contributor_line->{url};
         $updated_person->{first_name}  = $gcis_person->{first_name};
         $updated_person->{last_name}   = $gcis_person->{last_name};
         $updated_person->{middle_name} = $gcis_person->{middle_name};
         $updated_person->{orcid}       = $gcis_person->{orcid};
+        $updated_person->{id}          = $gcis_person->{id};
         $updates = 1;
     }
     if ( $contributor_line->{confirm_person_match} eq 'Update Name & URL in GCIS' ) {
-            say "Would update person" if $verbose;
+            say "Would update person url and name" if $verbose;
         $updated_person->{url}         = $contributor_line->{url};
         $updated_person->{first_name}  = $contributor_line->{first_name};
         $updated_person->{last_name}   = $contributor_line->{last_name};
         $updated_person->{middle_name} = $gcis_person->{middle_name};
         $updated_person->{orcid}       = $gcis_person->{orcid};
+        $updated_person->{id}          = $gcis_person->{id};
         $updates = 1;
     }
     if ( $contributor_line->{confirm_person_match} eq 'Update Name in GCIS' ) {
-            say "Would update person" if $verbose;
+            say "Would update person name" if $verbose;
         $updated_person->{url}         = $gcis_person->{url};
         $updated_person->{first_name}  = $contributor_line->{first_name};
         $updated_person->{last_name}   = $contributor_line->{last_name};
         $updated_person->{middle_name} = $gcis_person->{middle_name};
         $updated_person->{orcid}       = $gcis_person->{orcid};
+        $updated_person->{id}          = $gcis_person->{id};
         $updates = 1;
     }
 
     my $final_gcis_person = $gcis_person;
     if ( $updates ) {
         if ( $dry_run ) {
-            say "Would update person" if $verbose;
+            say "Would update person except dryrun" if $verbose;
         }
         else {
-            $final_gcis_person = $gcis->post("$gcis_person->{uri}.json", $updated_person)
+            $final_gcis_person = $gcis->post("$gcis_person->{uri}", $updated_person)
         }
     }
 
-    $seen_entities->{ $contributor_line->{orcid} } = 1;
     return $final_gcis_person;
 ## Complete Person Handling
 }
@@ -246,7 +253,7 @@ sub create_person {
     $updates->{last_name}   = $contributor_line->{last_name};
     $updates->{orcid}       = $contributor_line->{orcid};
 
-    my $final_gcis_person = $gcis->post('/person.json',$updates);
+    my $final_gcis_person = $gcis->post('/person',$updates);
     return $final_gcis_person;
 }
 
@@ -254,7 +261,11 @@ sub check_existing_orcid {
     my ($contributor_line, $gcis_person) = @_;
 
     return 0 if $dry_run;
-    return 1 if ( $contributor_line->{orcid} ne $gcis_person->{orcid} );
+    return 0 unless $gcis_person->{orcid};
+    if ( $contributor_line->{orcid} ne $gcis_person->{orcid} ) {
+        say "Mismatch! Contrib: $contributor_line->{orcid}. Person: $gcis_person->{orcid}";
+        return 1;
+    }
     return;
 }
 
@@ -268,23 +279,21 @@ sub handle_organization {
     }
     # New Organization
     ## No assigned org id and No seen org_name (created from an earlier line)
-    elsif ( $contributor_line->{organization_id} eq "" && ! exists $seen_entities->{ $contributor_line->{org_name} }) {
-        # Brand new org
-        #  "org_name org_type org_url org_country_code org_international_flag related_org related_org_relationship"
-       $gcis_organization = create_organization($contributor_line);
+    elsif ( $contributor_line->{organization_id} eq "" ) {
+        # Query by name, just to doublecheck
+        if ( $gcis_organization = $gcis->post("/organization/lookup/name", { name => $contributor_line->{org_name}}) ) {
+            say "Existing Org found via name" if $verbose;
+        } else {
+            # Brand new org
+            say "Creating new org" if $verbose;
+            $gcis_organization = create_organization($contributor_line);
+        }
     }
-    elsif ( $contributor_line->{person_id} ne "N/A") {
-        # Existing org in GCIS
+    else {
         $gcis_organization = $gcis->get("/organization/$contributor_line->{organization_id}");
         say "Existing GCIS Org" if $verbose;
     }
-    else {
-        # Person ID not provided, but we created this person earlier in the script
-        $gcis_organization = $gcis->get("/organization/$seen_entities->{$contributor_line->{org_name}}");
-        say "Existing GCIS Org created earlier" if $verbose;
-    }
 
-    $seen_entities->{ $contributor_line->{org_name} } = 1;
     return $gcis_organization;
 ## Complete Org Handling
 }
@@ -303,7 +312,7 @@ sub create_organization {
     $updates->{organization_type_identifier} = $contributor_line->{org_type};
     $updates->{international}                = $contributor_line->{org_international_flag} if $contributor_line->{org_international_flag};
 
-    my $final_gcis_org = $gcis->post('/organization.json', $updates);
+    my $final_gcis_org = $gcis->post('/organization', $updates);
     return $final_gcis_org;
 }
 
@@ -323,7 +332,7 @@ sub update_orcid {
     $updated_person->{middle_name} = $person->{middle_name};
     $updated_person->{orcid}       = $orcid;
 
-    my $final_gcis_person = $gcis->post("$person->{uri}.json", $updated_person);
+    my $final_gcis_person = $gcis->post("/person/$person->{id}", $updated_person);
     return $final_gcis_person;
 }
 
@@ -335,8 +344,10 @@ sub handle_contributor {
     # Does the contributor exist?
     my $contributions = $gcis->get("/person/$person->{id}/contributions/$role/article");
     for my $contribution ( @$contributions ) {
-        say "Contributor already exists" if $verbose;
-        return 1 if $contribution->{doi} eq $doi;
+        if ($contribution->{doi} eq $doi) {
+            say "Contributor already exists" if $verbose;
+            return 1;
+        }
     }
     my $contributor_fields = {
         person_id               => $person->{id},
@@ -345,7 +356,11 @@ sub handle_contributor {
     };
     $contributor_fields->{sort_key} = $sort_key if defined $sort_key;
 
-    my $result = $gcis->post("/article/contributors/$doi.json", $contributor_fields);
+    my $result = $gcis->post("/article/contributors/$doi", $contributor_fields);
+
+    my $msg = "Created Contributor";
+    say $msg if $verbose;
+    push @$handled, $msg;
 
     return 1;
 }
