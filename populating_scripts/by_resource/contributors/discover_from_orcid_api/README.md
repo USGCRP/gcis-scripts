@@ -149,12 +149,14 @@ The script takes the combined CSV information and handles these situations:
 
 Output CSV will have the following columns:
 
-  - doi             - DOI of the line
-  - orcid           - OrcID of the line
-  - contrib_role    - Contributor role of the line
-  - person_existed  - Whether the person existed in GCIS (TRUE), or was created (blank)
-  - person_updated  - If the person was updated, says what was updated. Otherwise blank.
-  - org_existed     - Whether the org existed in GCIS (TRUE), or was created (blank)
-  - contrib_existed - Whether the contrib existed in GCIS (TRUE), or was created (blank)
-  - errored         - If the line couldn't be processed, this will say why
-  - ignored         - If we skipped the line
+  - doi              - DOI of the line
+  - orcid            - OrcID of the line
+  - contrib_role     - Contributor role of the line
+  - ignored          - If we skipped the line
+  - person           - Whether the person existed or was created in GCIS, any updates applied.
+  - skipping_contrib - If, after updating the person, we skip out on the org and contrib sections.
+  - org              - Whether the org existed in GCIS, was created, or was not even processed
+  - contrib          - Whether the contributor existed in GCIS, was created, or was not even processed
+  - qa_contributor   - When the contributor exists we flag for additional QA on this item
+  - error            - If the line couldn't be processed, this will say why
+  
