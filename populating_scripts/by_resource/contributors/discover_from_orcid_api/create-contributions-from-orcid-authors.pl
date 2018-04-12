@@ -91,10 +91,11 @@ for my $contributor_line ( @$contributor_input_lines ) {
         orcid           => $contributor_line->{orcid},
         contrib_role    => $contributor_line->{contributor_role} // "author",
         ignored         => '',
+        skipping_contrib => '',
         person          => 'Not processed',
         org             => 'Not processed',
         contrib         => 'Not processed',
-        qa_contributor  => '',
+        contributor_needs_qa  => '',
         error           => '',
     };
 
@@ -112,7 +113,7 @@ for my $contributor_line ( @$contributor_input_lines ) {
     foreach my $req_field (@required) {
         unless ($contributor_line->{$req_field}) {
              say "\tLine missing required field $req_field";
-             $row_process->{error} += "Missing field $req_field. ";
+             $row_process->{error} .= "Missing field $req_field. ";
              $failed = 1;
         }
     }
@@ -124,6 +125,7 @@ for my $contributor_line ( @$contributor_input_lines ) {
     # Check for conflicting person info. Update if required. Hand back the person.
     my $person = handle_person( $contributor_line );
     if (! $person ) {
+        say "\tNo person could be established" if $verbose;
         push @$processed_rows, $row_process;
         next;
     }
@@ -175,7 +177,7 @@ sub dump_output {
     $t->date_separator('');
     my $output = $t->date . "_" . $t->time . "_output.csv";
     open my $fh, ">:encoding(utf8)", "$output" or die "$output: $!";
-    my @headers = keys %{$processed_rows->[0]};
+    my @headers = qw/doi orcid contrib_role ignored skipping_contrib person org contrib contributor_needs_qa error/;
     $csv->say($fh, \@headers);
     foreach my $row ( @$processed_rows ) {
         my @printable;
@@ -227,7 +229,7 @@ sub handle_person {
     my $gcis_person;
     if ( $contributor_line->{person_id} eq "N/A" ) {
         # Query by ORCID, just to doublecheck
-        my $gcis_person = $gcis->get("/person/$contributor_line->{orcid}");
+        $gcis_person = $gcis->get("/person/$contributor_line->{orcid}");
         if ( $gcis_person  ) {
             say "\tExisting Person found via ORCID" if $verbose;
             $row_process->{person} = "Existed";
@@ -304,7 +306,7 @@ sub handle_person {
     if ( $updates ) {
         $final_gcis_person = $gcis->post("$gcis_person->{uri}", $updated_person);
         if ( $final_gcis_person ) {
-            $row_process->{person} = "Updated Name and/or URL";
+            $row_process->{person} .= ". Updated Name and/or URL";
         }
         else {
             $row_process->{error} = "Person update failed";
@@ -437,7 +439,7 @@ sub handle_contributor {
         if ($contribution->{doi} eq $doi) {
             say "\tContributor with this person and role already exists" if $verbose;
             $row_process->{contrib} = "Existed";
-            $row_process->{qa_contributor} = "TRUE";
+            $row_process->{contributor_needs_qa} = "TRUE";
             return 1;
         }
     }
