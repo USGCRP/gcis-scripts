@@ -84,6 +84,7 @@ my $defunct_keywords;
 my $unchanged = 0;
 my $invalid = 0;
 my $differs = 0;
+my $gcis_uptodate = 1;
 
 my $count = 0;
 my $gcmd_version;
@@ -103,8 +104,13 @@ my $gcmd_version;
 
     my $result;
     $result .= "DRY-RUN: " if $dry;
-    $result .= "Updated GCIS to GCMD Keywords Version $gcmd_version";
-    $result .= $data_only ? " data fields (label/definition) only." : " data fields & parent structure.";
+    if ( $gcis_uptodate ) {
+        $result .= "GCIS already matches $gcmd_version";
+    }
+    else {
+        $result .= "Updated GCIS to GCMD Keywords Version $gcmd_version";
+        $result .= $data_only ? " data fields (label/definition) only." : " data fields & parent structure.";
+    }
     say $result;
 }
 
@@ -141,17 +147,20 @@ sub keyword_analyze {
         # throw an error? 
         say "No such keyword exists in either system" if $verbose;
         $invalid++;
+        $gcis_uptodate = 0;
     }
     elsif ( ! defined $gcis_keyword ) {
         say " ($gcmd_keyword->{label}) new to GCIS" if $verbose;
         $new_keywords->{$keyword} = $gcmd_keyword;
         push @$new_keywords_ordered, $keyword;
         @all_children = @{ $gcmd_keyword->{children}};
+        $gcis_uptodate = 0;
     }
     elsif ( ! defined $gcmd_keyword ) {
         say " ($gcis_keyword->{label}) now defunct" if $verbose;
         $defunct_keywords->{$keyword} = $gcis_keyword;
         @all_children = @{ $gcis_keyword->{children}};
+        $gcis_uptodate = 0;
     }
     elsif (my ($differences, $moved) = find_differences(gcis => $gcis_keyword, gcmd => $gcmd_keyword) ) {
         my $uptodate = 1;
@@ -165,11 +174,13 @@ sub keyword_analyze {
             $moved_keywords->{$keyword} = $moved;
             $uptodate = 0;
         }
+
         if ($uptodate) {
             say " ($gcmd_keyword->{label}) up to date" if $verbose;
             $unchanged++;
         }
         else {
+            $gcis_uptodate = 0;
             $differs++;
             print "\n" if $verbose;
         }
