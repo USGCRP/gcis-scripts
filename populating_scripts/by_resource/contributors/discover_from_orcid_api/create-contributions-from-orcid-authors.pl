@@ -273,7 +273,7 @@ sub handle_person {
     my $updated_person;
     if ( $contributor_line->{confirm_person_match} eq 'Update URL in GCIS' ) {
         say "\tUpdating person url" if $verbose;
-        $updated_person->{url}         = $contributor_line->{url};
+        $updated_person->{url}         = $contributor_line->{person_url};
         $updated_person->{first_name}  = $gcis_person->{first_name};
         $updated_person->{last_name}   = $gcis_person->{last_name};
         $updated_person->{middle_name} = $gcis_person->{middle_name};
@@ -283,7 +283,7 @@ sub handle_person {
     }
     if ( $contributor_line->{confirm_person_match} eq 'Update Name & URL in GCIS' ) {
         say "\tUpdating person url and name" if $verbose;
-        $updated_person->{url}         = $contributor_line->{url};
+        $updated_person->{url}         = $contributor_line->{person_url};
         $updated_person->{first_name}  = $contributor_line->{first_name};
         $updated_person->{last_name}   = $contributor_line->{last_name};
         $updated_person->{middle_name} = $gcis_person->{middle_name};
@@ -323,7 +323,7 @@ sub create_person {
     my ($contributor_line) = @_;
 
     my $updates;
-    $updates->{url}         = $contributor_line->{url} if $contributor_line->{url};
+    $updates->{url}         = $contributor_line->{person_url} if $contributor_line->{person_url};
     $updates->{first_name}  = $contributor_line->{first_name};
     $updates->{last_name}   = $contributor_line->{last_name};
     $updates->{orcid}       = $contributor_line->{orcid};
