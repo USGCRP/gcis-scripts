@@ -8,6 +8,18 @@ If the contributor already exists, nothing is changed.
 
 ## Use
 
+Test run:
+```
+./bulk-create-contributors.pl \
+    --url "https://data-stage.globalchange.gov" \
+    --input foo.csv \
+    --output output_qa_file.csv \
+    --dry
+    --verbose
+```
+
+
+Real run:
 ```
 ./bulk-create-contributors.pl \
     --url "https://data-stage.globalchange.gov" \

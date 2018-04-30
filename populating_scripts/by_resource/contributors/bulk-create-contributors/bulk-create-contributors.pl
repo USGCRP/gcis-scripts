@@ -31,6 +31,10 @@ Only process so many rows
 
 Output QA file. Defaults to [DATE]_[TIME]_output.csv.
 
+=item B<--dryrun>
+
+Don't actually add them
+
 =item B<--verbose>
 
 Chatter through the process
@@ -57,6 +61,7 @@ binmode(STDOUT, ':encoding(utf8)');
 
 GetOptions(
   'verbose'     => \(my $verbose = 0),
+  'dry'         => \(my $dry = 0),
   'url=s'       => \(my $url),
   'input_csv=s' => \(my $input_file),
   'max_line=s'  => \(my $max = -1),
@@ -139,6 +144,7 @@ for my $contributor_line ( @$contributor_input_lines ) {
     );
 
     if ( $contributor_created ) {
+        print "DRYRUN: " if $dry;
         say "\tContributor\tDOI $contributor_line->{doi}\tPerson $person->{id}\tOrg $org->{identifier}\tRole $contributor_line->{contributor_role} completed";
     }
     push @$processed_rows, $row_process;
@@ -234,21 +240,6 @@ sub get_organization {
     return $gcis_organization;
 }
 
-sub create_organization {
-    my ($contributor_line) = @_;
-
-    my $updates;
-    $updates->{name}                         = $contributor_line->{org_name};
-    $updates->{url}                          = $contributor_line->{org_url} if $contributor_line->{org_url};
-    $updates->{country_code}                 = $contributor_line->{org_country_code};
-    $updates->{organization_type_identifier} = $contributor_line->{org_type};
-    $updates->{international}                = $contributor_line->{org_international_flag} if $contributor_line->{org_international_flag};
-
-    my $final_gcis_org = $gcis->post('/organization', $updates);
-    return $final_gcis_org;
-}
-
-
 sub create_contributor {
     my ($person, $org, $doi, $role, $sort_key) = @_;
 
@@ -267,6 +258,14 @@ sub create_contributor {
         role                    => $role,
     };
     $contributor_fields->{sort_key} = $sort_key if defined $sort_key;
+
+
+    if ( $dry ) {
+        $row_process->{contributor} = "DRYRUN: Would Have Created";
+        say "\tDRYRUN: Would Have Created Contributor" if $verbose;
+        $row_process->{contributor_existed} = "FALSE";
+        return 1;
+    }
 
     my $result = $gcis->post("/article/contributors/$doi", $contributor_fields);
 
