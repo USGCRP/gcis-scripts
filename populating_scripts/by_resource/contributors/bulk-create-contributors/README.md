@@ -14,7 +14,7 @@ Test run:
     --url "https://data-stage.globalchange.gov" \
     --input foo.csv \
     --output output_qa_file.csv \
-    --dry
+    --dry \
     --verbose
 ```
 
