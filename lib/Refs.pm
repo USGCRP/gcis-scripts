@@ -8,6 +8,7 @@ use v5.14;
 
 my %multi_element_names = (
     author                     => 'Author',
+    title                      => 'Title',
     secondary_author           => 'Secondary Author',
     tertiary_author            => 'Tertiary Author',
     translated_author          => 'Translated Author',
@@ -28,7 +29,6 @@ my %singular_element_names = (
     reftype                    => 'reftype',
     author_address             => 'Author Address',
     #author_affiliation         => 'Author Affiliation',
-    title                      => 'Title',
     secondary_title            => 'Secondary Title',
     tertiary_title             => 'Tertiary Title',
     alt_title                  => 'Alternate Title',
