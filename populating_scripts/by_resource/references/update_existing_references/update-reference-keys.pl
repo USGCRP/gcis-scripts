@@ -79,6 +79,7 @@ GetOptions(
   'file=s'    => \(my $file),
   'update'   => \(my $update),
   'verbose'   => \(my $verbose),
+  'very_verbose' => \(my $very_verbose),
   'dry_run|n' => \(my $dry_run),
   'help|?'    => sub { pod2usage(verbose => 2) },
 ) or die pod2usage(verbose => 1);
@@ -97,7 +98,10 @@ sub main {
     say " file : $file";
     say " update existing on" if $update;
     say " verbose on" if $verbose;
+    say " very verbose on" if $very_verbose;
     say " dry run" if $dry_run;
+
+    $verbose = 1 if $very_verbose;
 
     my $gcis = $dry_run ? Gcis::Client->new(url => $url) :
                        Gcis::Client->connect(url => $url);
@@ -112,8 +116,8 @@ sub main {
             say " reference doesn't exist in GCIS, skipping: $new_ref->{uri}";
             next;
         }
-        say " new ref :\n".Dumper($new_ref) if $verbose;
-        say " gcis ref :\n".Dumper($gcis_ref->{attrs}) if $verbose;
+        say " new ref :\n".Dumper($new_ref) if $very_verbose;
+        say " gcis ref :\n".Dumper($gcis_ref->{attrs}) if $very_verbose;
         # Mesh info
         my $post_ref = mesh_reference($new_ref, $gcis_ref);
         update_ref($gcis_ref->{uri}, $gcis, $post_ref);
@@ -169,7 +173,7 @@ sub mesh_reference {
 sub update_ref {
     my ($uri, $gcis, $post_ref) = @_;
 
-    say " ref to post :\n".Dumper($post_ref) if $verbose;
+    say " ref to post :\n".Dumper($post_ref) if $very_verbose;
 
     if ($dry_run) {
         say " would update reference for : $post_ref->{identifier}";
