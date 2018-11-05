@@ -8,6 +8,13 @@ them into GCIS with this script.
 
 ## Usage
 
+### Prereqs
+
+[GCIS Perl Client](https://github.com/USGCRP/gcis-pl-client)  
+[GCIS API credentials](https://github.com/USGCRP/gcis-pl-client#configuration)
+
+### Showtime 
+
 Run against a test instance of with dry run on first.
 
 Updated Findings can be imported with the `--update`
