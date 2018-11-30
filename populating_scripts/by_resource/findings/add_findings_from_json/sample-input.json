@@ -1,0 +1,22 @@
+{
+    "chapter": 5,
+    "process": "<p>This is a process.</p><p>This is a cite {{< tbib '6' '3ff0e30a-c5ee-4ed9-8034-288be428125b' >}} and emphasis: <em>Climate Science Special Report</em>.{{< tbib '35' 'e8089a19-413e-4bc5-8c4a-7610399e268c' >}}<sup class='cm'>,</sup>{{<tbib '36' 'a29b612b-8c28-4c93-9c18-19314babce89' >}}</p>",
+    "kf": [
+ {
+     "identifier": "key-message-5-1",
+     "ordinal": 1,
+     "statement":  "<p>THIS is a statement</p>",
+     "evidence": "<p>evidence with cites {{< tbib '37' 'd9661451-b35d-4e0c-9551-cbc60c45c5ef' >}}<sup class='cm'>,</sup>{{<tbib '38' 'd1069afd-d9c4-4cc1-bd29-c50f637502bd' >}}<sup class='cm'>,</sup>{{<tbib '39' '87575740-3c5e-4669-8558-55621962abb8' >}}<sup class='cm'>,</sup>{{<tbib '40' '73760c11-7b97-4876-a24f-8fb54b01bca9' >}}<sup class='cm'>,</sup>{{<tbib '41' 'ea2c3f43-b493-4001-8489-959c0f55080a' >}}<sup class='cm'>,</sup>{{<tbib '42' '17850be8-349d-4e41-8f34-2510ce678c7b' >}}<sup class='cm'>,</sup>{{<tbib '137' '0615b4ff-d185-4e14-9d4d-5bea1ce6ca51' >}}</p>", 
+     "uncertainties": "<p>There is uncertainty </p>",
+     "confidence": "<p>Increasing temperature is <em>highly likely</em> to result in early snowmelt and increased consumptive use.</p>"
+ },
+ {
+     "identifier": "key-message-5-2",
+     "ordinal": 2,
+     "statement":  "<p>this is another statement</p>",
+     "evidence": "<p>evidence with cites {{< tbib '37' 'd9661451-b35d-4e0c-9551-cbc60c45c5ef' >}}<sup class='cm'>,</sup>{{<tbib '38' 'd1069afd-d9c4-4cc1-bd29-c50f637502bd' >}}<sup class='cm'>,</sup>{{<tbib '39' '87575740-3c5e-4669-8558-55621962abb8' >}}<sup class='cm'>,</sup>{{<tbib '40' '73760c11-7b97-4876-a24f-8fb54b01bca9' >}}<sup class='cm'>,</sup>{{<tbib '41' 'ea2c3f43-b493-4001-8489-959c0f55080a' >}}<sup class='cm'>,</sup>{{<tbib '42' '17850be8-349d-4e41-8f34-2510ce678c7b' >}}<sup class='cm'>,</sup>{{<tbib '137' '0615b4ff-d185-4e14-9d4d-5bea1ce6ca51' >}}</p>", 
+     "uncertainties": "<p>There is uncertainty </p>",
+     "confidence": "<p>Increasing temperature is <em>highly likely</em> to result in early snowmelt and increased consumptive use.</p>"
+ }
+    ]
+}

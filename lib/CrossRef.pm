@@ -1,6 +1,7 @@
 package CrossRef;
 
 use Gcis::Client;
+use Mojo::UserAgent;
 use Data::Dumper;
 use Clone::PP qw(clone);
 
@@ -10,8 +11,8 @@ use v5.14;
 sub new {
     my $class = shift;
     my $s;
-    my $g = Gcis::Client->new->url("http://api.crossref.org");
-    $s->{gcis} = $g;
+    my $g = Mojo::UserAgent->new;
+    $s->{crossref} = $g;
     bless $s, $class;
     return $s;
 }
@@ -19,11 +20,12 @@ sub new {
 sub get {
     my ($s, $doi) = @_;
 
-    my $d = $s->{gcis}->get("/works/$doi") or do {
+    my $d = $s->{crossref}->get("https://api.crossref.org/works/$doi") or do {
         say " no article for doi : $doi";
         return undef;
     };
-    my $r = $d->{message} or do {
+    say "Response: " . Dumper $d->result->json;
+    my $r = $d->result->json->{message} or do {
         say " no article content for doi : $doi";
         return undef;
     };

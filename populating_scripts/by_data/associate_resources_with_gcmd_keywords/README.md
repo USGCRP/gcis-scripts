@@ -43,7 +43,9 @@ Run for real:
 Running the sample input file:
 
 ```
-$ ./associate_resources_with_gcmd_keywords.pl --url https://data-review.globalchange.gov --input sample_input.csv
+$ ./associate_resources_with_gcmd_keywords.pl \
+>  --url https://data-review.globalchange.gov \
+>  --input sample_input.csv
 Found Columns: GCIS URI, GCMD Keyword UUID, Entity Type, Extra Col 1,  Extra Col 2, Notes
 Associating Resources with GCMD Keywords
      url : http://data-review.globalchange.gov:3000

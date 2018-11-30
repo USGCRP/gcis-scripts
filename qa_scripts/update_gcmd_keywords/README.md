@@ -72,6 +72,15 @@ checked with --limit may vary, though it will always include the root UUID.
   --verbose
 ```
 
+Running a dry-run after a successful update (& manual fix of defunct keywords)
+will output a confirmation message if everything matches:
+
+```
+...
+DRY-RUN: GCIS already matches 8.6
+...
+```
+
 ## Defunct Keywords
 
 The script does not delete keywords. Instead it outputs the message:

@@ -1,0 +1,11 @@
+---
+# Entry with just one new field, no updates
+- uri: /reference/00ba60eb-88b2-4ca5-860d-1af87a8becb2
+  ISSN: 1234-4312
+# Entry with one new field and one update field
+- uri: /reference/06df11af-a2ec-4d3b-9d7a-acf9783e1e4f
+  ISSN: 1234-4312
+  Year: 2013
+# Entry that doesn't exist should skip
+- uri: /reference/9e08d11c-6cbc-4531-8cb3-80f5b81fabb1
+  ISSN: 1234-4312
