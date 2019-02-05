@@ -104,8 +104,6 @@ sub connect_uris {
 
     if ($dry_run) {
         say "DRY RUN: Would connect region $region_uri with resource $fixed_resource_uri";
-        say "         post URI: $post_uri";
-        say "         post body:" . Dumper $post_body;
         return;
     }
 
