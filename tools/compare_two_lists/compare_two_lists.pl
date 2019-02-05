@@ -32,7 +32,6 @@ Verbose option
 
 =head1 EXAMPLES
 
-
   ./compare_two_files.pl \
     --afile foo.txt \
     --bfile bar.txt
@@ -41,6 +40,7 @@ Verbose option
 
 use Getopt::Long qw/GetOptions/;
 use Pod::Usage qw/pod2usage/;
+use Data::Dumper;
 
 use strict;
 use v5.14;
@@ -68,17 +68,23 @@ sub main {
     say " file_b : $file_b";
     say " verbose on" if $verbose;
 
+    say "File A: " . Dumper $source if $verbose;
+    say "File B: " . Dumper $compare if $verbose;
 
     my $remainder;
     for my $line ( @$source ){
         $remainder->{$line}=1;
     }
     for my $source_line ( @$source ) {
-        say "Checking '$source_line' " if $verbose;
+        $source_line =~ s///g;
+        say "Checking '$source_line' \n" if $verbose;
         for my $compare_line ( @$compare ) {
-            if ( $source_line eq $compare_line ) {
+            $compare_line =~ s///g;
+            say "  against '$compare_line' " if $verbose;
+            if ( "$source_line" eq "$compare_line" ) {
                 say "    - Found matching '$compare_line'" if $verbose;
                 delete $remainder->{$source_line};
+                last;
             }
         }
     }
@@ -92,8 +98,8 @@ sub main {
 sub load_file {
     my $file = shift;
 
-
     open my $handle, '<', $file;
+    #open my $handle, '<:encoding(UTF-8)', $file;
     chomp(my @lines = <$handle>);
     close $handle;
 
