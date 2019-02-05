@@ -124,7 +124,7 @@ pod2usage(msg => "missing input", verbose => 1) unless $input;
            next;
        }
 
-       my $rel_update = $uri;
+       my $rel_update = $result->{uri};
        $rel_update =~ s[/$type/][/$type/rel/];
        my $updated_rel = { new_gcmd_keyword => $gcmd };
        $gcis->post($rel_update, $updated_rel);

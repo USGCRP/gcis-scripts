@@ -169,7 +169,8 @@ sub main {
 sub load_data {
     my $file = shift;
 
-    open my $f, '<:encoding(UTF-8)', $file or die "can't open file : $file";
+    #open my $f, '<:encoding(UTF-8)', $file or die "can't open file : $file";
+    open my $f, '<', $file or die "can't open file : $file";
 
     my $json = do { local $/; <$f> };
     my $key_findings = decode_json($json);
