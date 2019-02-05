@@ -158,5 +158,8 @@ Output CSV will have the following columns:
   - org              - Whether the org existed in GCIS, was created, or was not even processed
   - contrib          - Whether the contributor existed in GCIS, was created, or was not even processed
   - qa_contributor   - When the contributor exists we flag for additional QA on this item
-  - error            - If the line couldn't be processed, this will say why
-  
+  - error            - If the line couldn't be processed, this will say why. QA these lines
+
+### Followup Work
+
+Related Organizations and Organization Alternate Names for the organization must be handled by hand, for now.
