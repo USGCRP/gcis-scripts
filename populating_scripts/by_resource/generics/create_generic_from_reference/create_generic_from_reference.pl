@@ -9,7 +9,6 @@ create_generic_from_reference.pl - creates & links generic pubs to refs
 create_generic_from_reference [options]
 
   Options:
-    --type refers to the type of reference to be updated.
     --url refers to the URL of the GCIS instance.
     --max_update is the maximum number of entries to update. 
     --dry_run is a flag that indicates a dry run.
@@ -19,19 +18,9 @@ create_generic_from_reference [options]
 
 =over 8
 
-=item B<--type>
+=item B<--file>
 
-the type of reference to be updated (default is cproc)
-
-the allowed values are:
-
-    marticle : Magazine Article
-    narticle : Newspaper Article
-    earticle : Electronic Article
-    cpaper   : Conference Paper
-    cproc    : Conference Proceedings
-    thesis   : Thesis
-    film     : Film or Broadcast
+the file containing the references to generate generic publications for
 
 =item B<--url>
 
@@ -66,29 +55,20 @@ use Gcis::Client;
 use Data::Dumper;
 use Getopt::Long;
 use Pod::Usage;
+use IO::File;
 use strict;
 binmode(STDOUT, ":utf8");
 
-my %types = (
-    marticle => 'Magazine Article',
-    narticle => 'Newspaper Article',
-    earticle => 'Electronic Article',
-    cpaper   => 'Conference Paper',
-    cproc    => 'Conference Proceedings',
-    thesis   => 'Thesis',
-    film     => 'Film or Broadcast',
-);
-
 $| = 1;
-my $type = "cproc";
 my $url   = "https://data-stage.globalchange.gov";
+my $reference_file;
 my $max_update = 100;
 my $dry_run = 0;
 my $help = 0;
 
 my $result = GetOptions (
-    "type=s"         => \$type,
     "url=s"          => \$url,
+    "file=s"         => \$reference_file,
     "max_update=i"   => \$max_update,
     "dry_run"        => \$dry_run,
     'help|?'         => \$help
@@ -96,40 +76,36 @@ my $result = GetOptions (
 
 pod2usage(-verbose => 2) if $help;
 
-if (!grep $type eq $_, keys %types) {
-    say "invalid type : $type";
-    pod2usage(-verbose => 2);
-}
-
-say " type : $type, $types{$type}";
+die "Reference file required" unless $reference_file;
 say " url $url";
 say " max update : $max_update";
 say " dry run" if $dry_run;
 
-my $all = "?all=1";
-my $ref_search = "/reference.json$all";
+my $references = load_reference_file();
 
-my $search = $url.$ref_search;
-say " search : $search";
 my $g = $dry_run ? Gcis::Client->new(    url => $url)
                  : Gcis::Client->connect(url => $url);
-my $refs = $g->get($ref_search);
-my $n = @$refs;
-say " n refs : $n";
+my $n = @$references;
+say " number of  references : $n";
 my $n_update = 0;
+my $n_existing = 0;
 my $i=0;
 
-for (@$refs) {
-    next if $_->{attrs}->{reftype} ne $types{$type};
-    next if $_->{child_publication_id};
+foreach my $ref_id (@$references) {
+
+    my $ref = $g->get("/reference/$ref_id");
+    if ($ref->{child_publication}) {
+        say "Existing Ref & Pub title : $ref->{attrs}->{Title}, ref uri : $ref->{uri}, child pub uri: $ref->{child_publication}";
+        $n_existing++;
+        next;
+    }
     $n_update++;
     last if $n_update > $max_update;
 
      my $generic_pub = {};
-     my $sub = \&{$type."_copy"};
-     $sub->($_, $generic_pub);
+     _copy($ref, $generic_pub);
 
-     say "updating title : $_->{attrs}->{Title}, uri : $_->{uri}";
+     say "Connecting Ref & Generic title : $ref->{attrs}->{Title}, uri : $ref->{uri}";
 
     if ($dry_run) {
         say "would have updated this reference";
@@ -137,92 +113,40 @@ for (@$refs) {
     }
 
     my $new_pub = $g->post("/generic", $generic_pub) or error $g->error;
-    my $ref_form = $g->get("/reference/form/update/$_->{identifier}");
-    $ref_form->{child_publication_uri} = $new_pub->{uri};
-    $ref_form->{publication_uri} = $g->get($ref_form->{publication_uri})->{uri};
-    delete $ref_form->{sub_publication_uris};
-
-    $g->post("/reference/$_->{identifier}", $ref_form) or die $g->error;
+    connect_reference_and_child($ref, $new_pub->{uri});
 }
 
-sub marticle_copy {
+sub connect_reference_and_child {
+    my ($ref, $child_pub_uri) = @_;
+
+    $g->post("/reference/$ref->{identifier}.json", {
+        child_publication_uri => $child_pub_uri,
+        identifier => $ref->{identifier},
+        attrs => $ref->{attrs}}
+    ) or error $g->error;
+}
+
+sub _copy {
     my ($ref, $pub) = @_;
-    for (qw(reftype Magazine ISSN Author Date Title Pages Volume Publisher Year URL)) {
-        $pub->{attrs}->{$_} = $ref->{attrs}->{$_};
-    }
-    $pub->{attrs}->{Issue} = $ref->{attrs}->{'Issue Number'};
-    $pub->{attrs}->{'Place Published'} = $ref->{attrs}->{'Place Published'};
-    return;
-}
-
-sub narticle_copy {
-   my ($ref, $pub) = @_;
-   for (qw(reftype Newspaper Title Pages Year URL)) {
-       $pub->{attrs}->{$_} = $ref->{attrs}->{$_};
-   }
-   $pub->{attrs}->{Date} = $ref->{attrs}->{'Issue Date'};
-   $pub->{attrs}->{Author} = $ref->{attrs}->{'Reporter'};
-   $pub->{attrs}->{'Place Published'} = $ref->{attrs}->{'Place Published'};
-   return;
-}
-
- sub earticle_copy {
-     my ($ref, $pub) = @_;
-     for (qw(reftype Author Year Title Publisher Issue URL)) {
-         $pub->{attrs}->{$_} = $ref->{attrs}->{$_};
-     }
-
-     $pub->{attrs}->{'Periodical Title'} = $ref->{attrs}->{'Periodical Title'}; 
-     $pub->{attrs}->{'Place Published'} = $ref->{attrs}->{'Place Published'}; 
-     $pub->{attrs}->{'E-Pub Date'} = $ref->{attrs}->{'E-Pub Date'};
-     return;
-  }
-
-sub cpaper_copy {
-   my ($ref, $pub) = @_;
-   for (qw(reftype Author Date Year Title DOI URL)) {
-       $pub->{attrs}->{$_} = $ref->{attrs}->{$_};
-   }
-
-    $pub->{attrs}->{'Conference Name'} = $ref->{attrs}->{'Conference Name'};
-    $pub->{attrs}->{'Conference Location'} = $ref->{attrs}->{'Conference Location'};
-    return;
-}
-
-sub cproc_copy {
-    my ($ref, $pub) = @_;
-    for (qw(reftype Author Title Date DOI URL)) {
-        $pub->{attrs}->{$_} = $ref->{attrs}->{$_};
+    for my $attr ( keys %{ $ref->{attrs} } ) {
+        $pub->{attrs}->{$attr} = $ref->{attrs}->{$attr};
     }
 
-    $pub->{attrs}->{'Year of Conference'} = $ref->{attrs}->{'Year of Conference'};
-    $pub->{attrs}->{'Conference Name'} = $ref->{attrs}->{'Conference Name'};
-    $pub->{attrs}->{'Conference Location'} = $ref->{attrs}->{'Conference Location'};
     return;
 }
 
-sub thesis_copy {
-    my ($ref, $pub) = @_;
-    for (qw(reftype Author Date University Year Title DOI URL)) {
-        $pub->{attrs}->{$_} = $ref->{attrs}->{$_};
+
+sub load_reference_file {
+    my @references;
+    my $fh = IO::File->new($reference_file, "r");
+    if (defined $fh) {
+        chomp(@references = <$fh>);
+        $fh->close;
     }
-
-    $pub->{attrs}->{'Academic Department'} = $ref->{attrs}->{'Academic Department'};
-    $pub->{attrs}->{'Number of Pages'} = $ref->{attrs}->{'Number of Pages'};
-    return;
+    return \@references;
 }
-
-sub film_copy {
-    my ($ref, $pub) = @_;
-        for (qw(reftype Director Year Title Producer URL)) {
-        $pub->{attrs}->{$_} = $ref->{attrs}->{$_};
-    }
-
-    $pub->{attrs}->{'Series Title'} = $ref->{attrs}->{'Series Title'};
-    $pub->{attrs}->{'Date Released'} = $ref->{attrs}->{'Date Released'};
-    return;
-}
-
+say "Existing References with Child Pubs: $n_existing";
+say "References given Generic Child Pubs: $n_update";
 say "done";
 
 __END__
