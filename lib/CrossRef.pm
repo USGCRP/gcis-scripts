@@ -24,7 +24,12 @@ sub get {
         say " no article for doi : $doi";
         return undef;
     };
-    say "Response: " . Dumper $d->result->json;
+    #say "Response: " . Dumper $d->result->json;
+    #
+    unless ( $d->result && $d->result->json && $d->result->json->{message} ) {
+        say " no article content for doi : $doi";
+        return undef;
+    };
     my $r = $d->result->json->{message} or do {
         say " no article content for doi : $doi";
         return undef;

@@ -9,6 +9,7 @@ use v5.14;
 my %multi_element_names = (
     author                     => 'Author',
     title                      => 'Title',
+    abstract                   => 'Abstract',
     secondary_author           => 'Secondary Author',
     tertiary_author            => 'Tertiary Author',
     translated_author          => 'Translated Author',
@@ -58,7 +59,6 @@ my %singular_element_names = (
     #report_id                  => 'Report Id',
     #coden                      => 'Coden',
     doi                        => 'DOI',
-    abstract                   => 'Abstract',
     label                      => 'Label',
     #image                      => 'Image',
     caption                    => 'Caption',
