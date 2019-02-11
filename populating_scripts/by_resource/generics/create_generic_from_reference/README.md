@@ -23,7 +23,7 @@ References with existing child pubs will be skipped.
 *Test Run*
 
 ```
-./create_generic_from_references.pl \
+./create_generic_from_reference.pl \
   --url https://data-stage.globalchange.gov \
   --file refs.txt \
   --dry \
@@ -33,7 +33,7 @@ References with existing child pubs will be skipped.
 *Create pubs and references*
 
 ```
-./create_generic_from_references.pl \
+./create_generic_from_reference.pl \
   --url https://data-stage.globalchange.gov \
   --file refs.txt \
   --max_update -1
