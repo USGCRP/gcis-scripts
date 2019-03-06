@@ -1,0 +1,324 @@
+[
+  {
+    "ordinal": 1,
+    "identifier": "historic-and-decadal-global-mean-emissions-and-their-partitioning-to-the-carbon-reservoirs-of-atmosphere-ocean-and-land",
+    "chapter_name": "overview-of-the-global-carbon-cycle",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Historic (a) and Decadal (b) Global Mean Emissions and Their Partitioning to the Carbon Reservoirs of Atmosphere, Ocean, and Land"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "average-modeled-net-ecosystem-production",
+    "chapter_name": "grasslands",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Average Modeled Net Ecosystem Production"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "carbon-fluxes-and-stocks-for-grasslands-and-shrublands-in-the-conterminous-united-states",
+    "chapter_name": "grasslands",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Carbon Fluxes and Stocks for Grasslands and Shrublands in the Conterminous United States"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "soil-carbon-pools-to-3m-in-depth-for-the-northern-circumpolar-permafrost-zone",
+    "chapter_name": "arctic-and-boreal-carbon",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Soil Carbon Pools to 3 m in Depth for the Northern Circumpolar Permafrost Zone"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "vegetation-carbon-pools-for-north-america-and-global-northern-high-latitude-regions",
+    "chapter_name": "arctic-and-boreal-carbon",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Vegetation Carbon Pools for North America and Global Northern High-Latitude Regions"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "estimates-of-soil-carbon-storage-in-the-conterminous-united-states-in-different-land-use-classes",
+    "chapter_name": "soils",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estimates of Soil Carbon Storage in the Conterminous United States in Different Land-Use Classes (a-d)"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "soil-organic-carbon-distribution-in-mexico-by-fao-fra-classes",
+    "chapter_name": "soils",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Soil Organic Carbon Distribution in Mexico by FAO FRA (a) Classes (b)"
+  },
+  {
+    "ordinal": 3,
+    "identifier": "soil-organic-carbon-distribution-in-mexico-for-vegetation-types-with-top-five-highest-total-soil-carbon-estimates",
+    "chapter_name": "soils",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Soil Organic Carbon Distribution in Mexico for Vegetation Types with Top Five Highest Total Soil Carbon Estimates (a)"
+  },
+  {
+    "ordinal": 4,
+    "identifier": "estimates-of-soil-carbon-storage-in-canada",
+    "chapter_name": "soils",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estimates of Soil Carbon Storage in Canada (a-b)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "area-carbon-pool-net-ecosystem-exchange-of-carbon-and-methane-emissions-from-wetlands-in-north-america",
+    "chapter_name": "terrestrial-wetlands",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Area, Carbon Pool, Net Ecosystem Exchange of Carbon, and Methane Emissions from Wetlands in North America (a-c)"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "estimates-of-wetland-area-total-carbon-storage-carbon-dioxide-and-methane-fluxes-and-net-carbon-flux-by-major-us-region",
+    "chapter_name": "terrestrial-wetlands",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estimates of Wetland Area, Total Carbon Storage, Carbon Dioxide and Methane Fluxes, and Net Carbon Flux by Major U.S. Region (a-b)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "us-north-american-and-global-annual-carbon-fluxes-from-inland-waters",
+    "chapter_name": "inland-waters",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "U.S., North American, and Global Annual Carbon Fluxes from Inland Waters (a-k)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "average-values-for-ecosystem-extent",
+    "chapter_name": "tidal-wetlands-and-estuaries",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Average Values for Ecosystem Extent"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "carbon-accumulation-rate-car-and-associated-data-for-tidal-estuarine-salt-and-brackish-marsh",
+    "chapter_name": "tidal-wetlands-and-estuaries",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Carbon Accumulation Rate (CAR) and Associated Data  for Tidal Estuarine (Salt and Brackish) Marsh (a)"
+  },
+  {
+    "ordinal": 3,
+    "identifier": "estuarine-co2-outgassing-for-north-america",
+    "chapter_name": "tidal-wetlands-and-estuaries",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estuarine CO2 Outgassing for North America (a,e)"
+  },
+  {
+    "ordinal": 4,
+    "identifier": "estuarine-areas-and-organic-carbon-regional-budgets-for-the-conterminous-united-states",
+    "chapter_name": "tidal-wetlands-and-estuaries",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estuarine Areas and Organic Carbon Regional Budgets for the Conterminous United States (a,c)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "regional-estimates-of-net-air-sea-carbon-dioxide-exchange-from-observations-and-regional-models",
+    "chapter_name": "coastal-ocean-and-continental-shelves",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Regional Estimates of Net Air-Sea Carbon Dioxide Exchange from Observations and Regional Models (a,b)"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "regional-estimates-of-net-air-sea-carbon-dioxide-exchange-from-two-data-syntheses-and-a-process-based-model-for-the-marcats-regions",
+    "chapter_name": "coastal-ocean-and-continental-shelves",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Regional Estimates of Net Air-Sea Carbon Dioxide Exchange from Two Data Syntheses  and a Process-Based Model for the MARCATS Regions (a,b)"
+  },
+  {
+    "ordinal": 3,
+    "identifier": "subregions-of-the-combined-exclusive-economic-zone-of-canada-the-united-states-and-mexico",
+    "chapter_name": "coastal-ocean-and-continental-shelves",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Subregions of the Combined Exclusive Economic Zone of Canada, the United States, and Mexico (a)"
+  },
+  {
+    "ordinal": 4,
+    "identifier": "estimates-of-carbon-burial-and-primary-production-net-primary-production-npp-and-simulated-npp-and-air-sea-exchange-of-carbon-dioxide-for-the-exclusive-economic-zone",
+    "chapter_name": "coastal-ocean-and-continental-shelves",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estimates of Carbon Burial and Primary Production, (a) Net Primary Production (NPP), (b) and Simulated NPP and Air-Sea Exchange of Carbon Dioxide (c) for the Exclusive Economic Zone"
+  },
+  {
+    "ordinal": 5,
+    "identifier": "approximate-summary-carbon-budget-for-the-exclusive-economic-zone-of-north-america",
+    "chapter_name": "coastal-ocean-and-continental-shelves",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Approximate Summary Carbon Budget for the Exclusive Economic Zone of North America (a-d)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "summary-of-options-capacity-and-co-effects-for-reducing-greenhouse-gases-ghgs-in-north-america-activity-impact-on-ghgs-potential-reduction-co-effects",
+    "chapter_name": "carbon-cycle-science-in-support-of-decision-making",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Summary of Options, Capacity, and Co-Effects for Reducing Greenhouse Gases (GHGs)  in North America (a) Activity Impact on GHGs Potential Reduction (b) Co-Effects"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "research-to-support-carbon-cycle-decision-making",
+    "chapter_name": "carbon-cycle-science-in-support-of-decision-making",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Research to Support Carbon Cycle Decision Making"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "projected-energy-related-emissions-from-fossil-fuel-burning-for-canada-mexico-the-united-states-and-north-america-from-2015-to-2040",
+    "chapter_name": "future-of-the-north-american-carbon-cycle",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Projected Energy-Related Emissions from Fossil Fuel Burning for Canada, Mexico,  the United States, and North America from 2015 to 2040"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "estimated-stocks-of-major-north-american-carbon-pools-ca-2013",
+    "chapter_name": "the-north-american-carbon-budget",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estimated Stocks of Major North American Carbon Pools ca. 2013 (a)"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "estimated-stocks-of-major-north-american-carbon-pools-ca-2013",
+    "chapter_name": "the-north-american-carbon-budget",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estimated Stocks of Major North American Carbon Pools ca. 2013 (a)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "north-american-proven-energy-reserves-2015",
+    "chapter_name": "energy-systems",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "North American Proven Energy Reserves (2015) (a)"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "north-american-nonfossil-fuel-electricity-capacity-2015",
+    "chapter_name": "energy-systems",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "North American Nonfossil Fuel Electricity Capacity (2015) (a)"
+  },
+  {
+    "ordinal": 3,
+    "identifier": "five-major-trends-indicators-drivers-and-impacts-on-the-carbon-cycle",
+    "chapter_name": "energy-systems",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Five Major Trends, Indicators, Drivers, and Impacts on the Carbon Cycle"
+  },
+  {
+    "ordinal": 4,
+    "identifier": "leed-certified-buildings-and-gross-m2-coverage-in-north-america-2016",
+    "chapter_name": "energy-systems",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "LEED-Certified Buildings and Gross m^2 Coverage in North America (2016) (a,b)"
+  },
+  {
+    "ordinal": 5,
+    "identifier": "projected-greenhouse-gas-emissions-for-north-america-2015-to-2040",
+    "chapter_name": "energy-systems",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Projected Greenhouse Gas Emissions for North America (2015 to 2040) (a)"
+  },
+  {
+    "ordinal": 6,
+    "identifier": "technological-assumptions-in-the-energy-modeling-forum-study",
+    "chapter_name": "energy-systems",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Technological Assumptions in the Energy Modeling Forum Study (a)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "scientifically-based-urban-carbon-estimation-studies-in-north-american-cities",
+    "chapter_name": "understanding-urban-carbon-fluxes",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Scientifically Based Urban Carbon Estimation Studies in North American Cities"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "greenhouse-gas-fluxes-from-north-american-agriculture",
+    "chapter_name": "agriculture",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Greenhouse Gas Fluxes from North American Agriculture"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "estimated-methane-emissions-from-livestock-manure-sources-in-the-united-states",
+    "chapter_name": "agriculture",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estimated Methane Emissions from Livestock Manure Sources in the United States"
+  },
+  {
+    "ordinal": 3,
+    "identifier": "united-states-agricultural-lands-by-sector-and-percentage-of-cropland-reportedly-managed-with-conservation-practice-and-distribution-of-crops-and-managements",
+    "chapter_name": "agriculture",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "United States Agricultural Lands by Sector and Percentage of Cropland Reportedly Managed with Conservation Practice and Distribution of Crops and Managements (a)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "changes-to-reduce-fossil-fuel-consumption-at-various-social-and-temporal-scales",
+    "chapter_name": "social-science-perspectives-on-carbon",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Changes to Reduce Fossil Fuel Consumption at Various Social and Temporal Scales (a,b)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "energy-resources-on-tribal-lands-in-the-united-states",
+    "chapter_name": "tribal-lands",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Energy Resources on Tribal Lands in the United States (a)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "estimates-of-annual-north-american-land-biosphere-carbon-dioxide-co2-fluxes-including-fire-derived-from-atmospheric-co2-measurements-using-inverse-models-and-the-us-environmental-protection-agency-epa-inventory-over-the-period-2004-to-2013",
+    "chapter_name": "observations-of-atmospheric-carbon-dioxide-and-methane",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estimates of Annual, North American, Land Biosphere Carbon Dioxide (CO2) Fluxes (Including Fire) Derived from Atmospheric CO2 Measurements Using Inverse Models and the U.S. Environmental Protection Agency (EPA) Inventory over the Period 2004 to 2013"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "estimated-area-in-thousands-of-hectares-of-forest-and-other-wooded-land-in-north-america-in-2005-and-2015",
+    "chapter_name": "forests",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Estimated Area (in Thousands of Hectares) of Forest and Other Wooded Land in North America in 2005 and 2015"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "forest-carbon-stocks-in-teragrams-of-carbon-by-carbon-pool-in-north-america",
+    "chapter_name": "forests",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Forest Carbon Stocks (in Teragrams of Carbon) by Carbon Pool in North America"
+  },
+  {
+    "ordinal": 3,
+    "identifier": "net-emissions-of-carbon-dioxide-equivalent-co2e-for-forestlands-from-net-forest-gain-and-loss-tree-growth-in-urbanized-settlements-and-harvested-wood-products-of-domestic-origin-by-country-and-expressed-in-teragrams-of-carbon-tg-c-per-year",
+    "chapter_name": "forests",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Net Emissions of Carbon Dioxide Equivalent (CO2e) (a) for Forestlands from Net Forest Gain and Loss, Tree Growth in Urbanized Settlements, and Harvested Wood Products of Domestic Origin, by Country and Expressed in Teragrams of Carbon (Tg C) per Year"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "intergovernmental-panel-on-climate-change-ipcc-source-sink-codes-and-categories",
+    "chapter_name": "appendix-e-fossil-fuel-emissions-estimates-for-north-america",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Intergovernmental Panel on Climate Change (IPCC) Source/Sink Codes and Categories"
+  },
+  {
+    "ordinal": 2,
+    "identifier": "north-american-fossil-fuel-carbon-dioxide-emissions",
+    "chapter_name": "appendix-e-fossil-fuel-emissions-estimates-for-north-america",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "North American Fossil Fuel Carbon Dioxide Emissions (a)"
+  },
+  {
+    "ordinal": 3,
+    "identifier": "summary-statistics-on-north-american-fossil-fuel-carbon-dioxide-emissions",
+    "chapter_name": "appendix-e-fossil-fuel-emissions-estimates-for-north-america",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Summary Statistics on North American Fossil Fuel Carbon Dioxide Emissions (a)"
+  },
+  {
+    "ordinal": 1,
+    "identifier": "examples-of-soccr2-chapters-with-topics-related-to-nca4-vol-ii-chapters",
+    "chapter_name": "preface",
+    "report": "second-state-carbon-cycle-report-soccr2-sustained-assessment-report",
+    "title": "Examples of SOCCR2 Chapters with Topics Related to NCA4 Vol. II Chapters (a)"
+  }
+]
